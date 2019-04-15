@@ -70,6 +70,18 @@ var (
 	months      = []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 	days        = []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 	daysInMonth = []int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+
+	// pre-defined cron expressions
+	special = map[string]string{
+		"@yearly":  "0 0 0 1 1 *",
+		"@monthly": "0 0 0 1 * *",
+		"@weekly":  "0 0 0 * * 0",
+		"@daily":   "0 0 0 * * *",
+		"@hourly":  "0 0 * * * *",
+	}
+
+	readDateLayout  = "Mon Jan 2 15:04:05 2006"
+	writeDateLayout = "Jan 2 15:04:05 2006"
 )
 
 //<second> <minute> <hour> <day-of-month> <month> <day-of-week> <year>
@@ -97,23 +109,21 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 			}
 		}
 	}()
-	// UnixDate    = "Mon Jan _2 15:04:05 MST 2006"
-	tfmt := time.Unix(prev, 0).Format(time.UnixDate)
+	tfmt := time.Unix(prev, 0).UTC().Format(readDateLayout)
 	ttok := strings.Split(strings.Replace(tfmt, "  ", " ", 1), " ")
 	hms := strings.Split(ttok[3], ":")
-	parser.maxDays = maxDays(intVal(months, ttok[1]), atoi(ttok[5]))
+	parser.maxDays = maxDays(intVal(months, ttok[1]), atoi(ttok[4]))
 
 	second := parser.nextSeconds(atoi(hms[2]), fields[0])
 	minute := parser.nextMinutes(atoi(hms[1]), fields[1])
 	hour := parser.nextHours(atoi(hms[0]), fields[2])
-	dayOfWeek, dayOfMonth := parser.nextDay(intVal(days, ttok[0]), fields[5],
-		atoi(strings.Replace(ttok[2], "_", "", 1)), fields[3])
+	dayOfMonth := parser.nextDay(intVal(days, ttok[0]), fields[5], atoi(ttok[2]), fields[3])
 	month := parser.nextMonth(ttok[1], fields[4])
-	year := parser.nextYear(ttok[5], fields[6])
+	year := parser.nextYear(ttok[4], fields[6])
 
-	nstr := fmt.Sprintf("%s %s %s %s:%s:%s %s %s", dayOfWeek, month, dayOfMonth,
-		hour, minute, second, ttok[4], year)
-	ntime, err := time.Parse(time.UnixDate, nstr)
+	nstr := fmt.Sprintf("%s %s %s:%s:%s %s", month, strconv.Itoa(dayOfMonth),
+		hour, minute, second, year)
+	ntime, err := time.Parse(writeDateLayout, nstr)
 	nextTime = ntime.Unix()
 	return
 }
@@ -121,7 +131,11 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 //the ? wildcard is only used in the day of month and day of week fields
 func validateCronExpression(expression string) ([]*CronField, error) {
 	var tokens []string
-	tokens = strings.Split(expression, " ")
+	if value, ok := special[expression]; ok {
+		tokens = strings.Split(value, " ")
+	} else {
+		tokens = strings.Split(expression, " ")
+	}
 	length := len(tokens)
 	if length < 6 || length > 7 {
 		return nil, cronError("length")
@@ -129,7 +143,7 @@ func validateCronExpression(expression string) ([]*CronField, error) {
 	if length == 6 {
 		tokens = append(tokens, "*")
 	}
-	if (tokens[3] != "?" && tokens[3] != "*") && tokens[5] != "?" {
+	if (tokens[3] != "?" && tokens[3] != "*") && (tokens[5] != "?" && tokens[5] != "*") {
 		return nil, cronError("day field set twice")
 	}
 	if tokens[6] != "*" {
@@ -276,21 +290,19 @@ func (parser *CronExpressionParser) nextHours(prev int, field *CronField) string
 }
 
 func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
-	prevMonth int, monthField *CronField) (string, string) {
-	var nextMonth, nextWeek int
+	prevMonth int, monthField *CronField) int {
+	var nextMonth int
 	if weekField.isEmpty() && monthField.isEmpty() && parser.lastSet(dayOfWeekIndex) {
 		if parser.dayBump {
 			nextMonth, parser.monthBump = bumpValue(prevMonth, parser.maxDays, 1)
-			nextWeek, _ = bumpLiteral(prevWeek, 6, 1)
-			return days[nextWeek], alignDigit(nextMonth, " ")
+			return nextMonth
 		}
-		return days[prevWeek], alignDigit(prevMonth, " ")
+		return prevMonth
 	}
 	if len(monthField.values) > 0 {
 		nextMonth, parser.monthBump = parser.findNextValue(prevMonth, monthField.values)
 		parser.setDone(dayOfMonthIndex)
-		nextWeek, _ = bumpLiteral(prevWeek, 6, step(prevMonth, nextMonth, parser.maxDays))
-		return days[nextWeek], alignDigit(nextMonth, " ")
+		return nextMonth
 	} else if len(weekField.values) > 0 {
 		nextWeek, bumpDayOfMonth := parser.findNextValue(prevWeek, weekField.values)
 		parser.setDone(dayOfWeekIndex)
@@ -301,9 +313,9 @@ func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
 			_step = step(prevWeek, nextWeek, 7)
 		}
 		nextMonth, parser.monthBump = bumpValue(prevMonth, parser.maxDays, _step)
-		return days[nextWeek], alignDigit(nextMonth, " ")
+		return nextMonth
 	}
-	return days[prevWeek], alignDigit(prevMonth, " ")
+	return prevMonth
 }
 
 func (parser *CronExpressionParser) nextMonth(prev string, field *CronField) string {
