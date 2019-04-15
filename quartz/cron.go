@@ -32,6 +32,11 @@ func NewCronTrigger(expr string) (*CronTrigger, error) {
 	return &CronTrigger{fields, lastDefined}, nil
 }
 
+func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
+	parser := NewCronExpressionParser(ct.lastDefined)
+	return parser.nextTime(prev, ct.fields)
+}
+
 type CronExpressionParser struct {
 	minuteBump bool
 	hourBump   bool
@@ -78,11 +83,6 @@ const (
 	dayOfWeekIndex
 	yearIndex
 )
-
-func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
-	parser := NewCronExpressionParser(ct.lastDefined)
-	return parser.nextTime(prev, ct.fields)
-}
 
 func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (nextTime int64, err error) {
 	defer func() {
