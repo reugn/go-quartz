@@ -67,9 +67,9 @@ func (cf *CronField) toString() string {
 }
 
 var (
-	months      = []string{"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
+	months      = []string{"0", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
 	days        = []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
-	daysInMonth = []int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	daysInMonth = []int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 
 	// pre-defined cron expressions
 	special = map[string]string{
@@ -322,7 +322,7 @@ func (parser *CronExpressionParser) nextMonth(prev string, field *CronField) str
 	var next int
 	if field.isEmpty() && parser.lastSet(dayOfWeekIndex) {
 		if parser.monthBump {
-			next, parser.yearBump = bumpLiteral(intVal(months, prev), 11, 1)
+			next, parser.yearBump = bumpLiteral(intVal(months, prev), 12, 1)
 			return months[next]
 		}
 		return prev
@@ -354,7 +354,7 @@ func bumpLiteral(iprev int, max int, step int) (int, bool) {
 		if bumped%max == 0 {
 			return iprev, true
 		}
-		return (bumped % max) - 1, true
+		return (bumped % max), true
 	}
 	return bumped, false
 }
