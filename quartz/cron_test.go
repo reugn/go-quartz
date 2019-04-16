@@ -70,7 +70,7 @@ func TestCronExpression6(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Mon Mar 22 18:00:00 2021")
+	assertEqual(t, result, "Mon Mar 15 18:00:00 2021")
 }
 
 func TestCronExpression7(t *testing.T) {
@@ -83,6 +83,18 @@ func TestCronExpression7(t *testing.T) {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
 	assertEqual(t, result, "Tue Jul 16 16:09:00 2019")
+}
+
+func TestCronYearly(t *testing.T) {
+	prev := int64(1555351200)
+	result := ""
+	cronTrigger, err := NewCronTrigger("@yearly")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 100)
+	}
+	assertEqual(t, result, "Sun Jan 1 00:00:00 2119")
 }
 
 func TestCronMonthly(t *testing.T) {
@@ -106,7 +118,7 @@ func TestCronWeekly(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 100)
 	}
-	assertEqual(t, result, "Thu Mar 18 00:00:00 2021")
+	assertEqual(t, result, "Mon Mar 15 00:00:00 2021")
 }
 
 func TestCronDaily(t *testing.T) {
@@ -118,7 +130,7 @@ func TestCronDaily(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Wed Jan 12 00:00:00 2022")
+	assertEqual(t, result, "Sun Jan 9 00:00:00 2022")
 }
 
 func TestCronHourly(t *testing.T) {
