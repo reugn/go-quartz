@@ -10,6 +10,7 @@ import (
 )
 
 type CronTrigger struct {
+	expression  string
 	fields      []*CronField
 	lastDefined int
 }
@@ -29,12 +30,16 @@ func NewCronTrigger(expr string) (*CronTrigger, error) {
 	if lastDefined == -1 {
 		fields[0].values, _ = fillRange(0, 59)
 	}
-	return &CronTrigger{fields, lastDefined}, nil
+	return &CronTrigger{expr, fields, lastDefined}, nil
 }
 
 func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 	parser := NewCronExpressionParser(ct.lastDefined)
 	return parser.nextTime(prev, ct.fields)
+}
+
+func (st *CronTrigger) Description() string {
+	return fmt.Sprintf("CronTrigger %s", st.expression)
 }
 
 type CronExpressionParser struct {
@@ -109,7 +114,7 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 			}
 		}
 	}()
-	tfmt := time.Unix(prev, 0).UTC().Format(readDateLayout)
+	tfmt := time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout)
 	ttok := strings.Split(strings.Replace(tfmt, "  ", " ", 1), " ")
 	hms := strings.Split(ttok[3], ":")
 	parser.maxDays = maxDays(intVal(months, ttok[1]), atoi(ttok[4]))
@@ -124,7 +129,7 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 	nstr := fmt.Sprintf("%s %s %s:%s:%s %s", month, strconv.Itoa(dayOfMonth),
 		hour, minute, second, year)
 	ntime, err := time.Parse(writeDateLayout, nstr)
-	nextTime = ntime.Unix()
+	nextTime = ntime.UnixNano()
 	return
 }
 

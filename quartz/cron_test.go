@@ -6,7 +6,7 @@ import (
 )
 
 func TestCronExpression1(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("10/20 15 14 5-10 * ? *")
 	if err != nil {
@@ -18,7 +18,7 @@ func TestCronExpression1(t *testing.T) {
 }
 
 func TestCronExpression2(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* 5,7,9 14-16 * * ? *")
 	if err != nil {
@@ -30,7 +30,7 @@ func TestCronExpression2(t *testing.T) {
 }
 
 func TestCronExpression3(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* 5,7,9 14/2 * * Wed,Sat *")
 	if err != nil {
@@ -50,7 +50,7 @@ func TestCronExpression4(t *testing.T) {
 }
 
 func TestCronExpression5(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* * * * * ? *")
 	if err != nil {
@@ -62,7 +62,7 @@ func TestCronExpression5(t *testing.T) {
 }
 
 func TestCronExpression6(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* * 14/2 * * Mon/3 *")
 	if err != nil {
@@ -74,7 +74,7 @@ func TestCronExpression6(t *testing.T) {
 }
 
 func TestCronExpression7(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* 5-9 14/2 * * 0-2 *")
 	if err != nil {
@@ -86,7 +86,7 @@ func TestCronExpression7(t *testing.T) {
 }
 
 func TestCronYearly(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("@yearly")
 	if err != nil {
@@ -98,7 +98,7 @@ func TestCronYearly(t *testing.T) {
 }
 
 func TestCronMonthly(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("@monthly")
 	if err != nil {
@@ -110,7 +110,7 @@ func TestCronMonthly(t *testing.T) {
 }
 
 func TestCronWeekly(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("@weekly")
 	if err != nil {
@@ -122,7 +122,7 @@ func TestCronWeekly(t *testing.T) {
 }
 
 func TestCronDaily(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("@daily")
 	if err != nil {
@@ -134,7 +134,7 @@ func TestCronDaily(t *testing.T) {
 }
 
 func TestCronHourly(t *testing.T) {
-	prev := int64(1555351200)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("@hourly")
 	if err != nil {
@@ -155,10 +155,10 @@ func iterate(prev int64, cronTrigger *CronTrigger, iterations int) (string, erro
 	var err error
 	for i := 0; i < iterations; i++ {
 		prev, err = cronTrigger.NextFireTime(prev)
-		// fmt.Println(time.Unix(prev, 0).UTC().Format(readDateLayout))
+		// fmt.Println(time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout))
 		if err != nil {
 			return "", err
 		}
 	}
-	return time.Unix(prev, 0).UTC().Format(readDateLayout), nil
+	return time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout), nil
 }
