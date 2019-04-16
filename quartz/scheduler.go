@@ -36,7 +36,7 @@ func NewStdScheduler() *StdScheduler {
 }
 
 func (sched *StdScheduler) ScheduleJob(job Job, trigger Trigger) error {
-	nextRunTime, err := trigger.NextFireTime(time.Now().UnixNano())
+	nextRunTime, err := trigger.NextFireTime(time.Now().UTC().UnixNano())
 	if err == nil {
 		sched.feeder <- &Item{
 			job,
@@ -132,7 +132,7 @@ func (sched *StdScheduler) startFeedReader() {
 }
 
 func parkTime(ts int64) int64 {
-	now := time.Now().UnixNano()
+	now := time.Now().UTC().UnixNano()
 	if ts > now {
 		return ts - now
 	}
