@@ -6,7 +6,7 @@ import (
 )
 
 func TestCronExpression1(t *testing.T) {
-	prev := int64(1554120000)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("10/20 15 14 5-10 * ? *")
 	if err != nil {
@@ -14,11 +14,11 @@ func TestCronExpression1(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Wed Nov  8 14:15:10 IST 2023")
+	assertEqual(t, result, "Fri Dec 8 14:15:10 2023")
 }
 
 func TestCronExpression2(t *testing.T) {
-	prev := int64(1554120000)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* 5,7,9 14-16 * * ? *")
 	if err != nil {
@@ -26,11 +26,11 @@ func TestCronExpression2(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Sun Jul 21 15:05:00 IDT 2019")
+	assertEqual(t, result, "Mon Aug 5 14:05:00 2019")
 }
 
 func TestCronExpression3(t *testing.T) {
-	prev := int64(1554120000)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* 5,7,9 14/2 * * Wed,Sat *")
 	if err != nil {
@@ -38,7 +38,7 @@ func TestCronExpression3(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Wed Nov 20 22:05:00 IST 2019")
+	assertEqual(t, result, "Sat Dec 7 14:05:00 2019")
 }
 
 func TestCronExpression4(t *testing.T) {
@@ -50,7 +50,7 @@ func TestCronExpression4(t *testing.T) {
 }
 
 func TestCronExpression5(t *testing.T) {
-	prev := int64(1554120000)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* * * * * ? *")
 	if err != nil {
@@ -58,11 +58,11 @@ func TestCronExpression5(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Mon Apr  1 15:16:40 IDT 2019")
+	assertEqual(t, result, "Mon Apr 15 18:16:40 2019")
 }
 
 func TestCronExpression6(t *testing.T) {
-	prev := int64(1554120000)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* * 14/2 * * Mon/3 *")
 	if err != nil {
@@ -70,11 +70,11 @@ func TestCronExpression6(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Thu Mar  4 20:00:00 IST 2021")
+	assertEqual(t, result, "Mon Mar 15 18:00:00 2021")
 }
 
 func TestCronExpression7(t *testing.T) {
-	prev := int64(1554120000)
+	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := NewCronTrigger("* 5-9 14/2 * * 0-2 *")
 	if err != nil {
@@ -82,7 +82,67 @@ func TestCronExpression7(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Tue Jul  2 14:09:00 IDT 2019")
+	assertEqual(t, result, "Tue Jul 16 16:09:00 2019")
+}
+
+func TestCronYearly(t *testing.T) {
+	prev := int64(1555351200000000000)
+	result := ""
+	cronTrigger, err := NewCronTrigger("@yearly")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 100)
+	}
+	assertEqual(t, result, "Sun Jan 1 00:00:00 2119")
+}
+
+func TestCronMonthly(t *testing.T) {
+	prev := int64(1555351200000000000)
+	result := ""
+	cronTrigger, err := NewCronTrigger("@monthly")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 100)
+	}
+	assertEqual(t, result, "Sun Aug 1 00:00:00 2027")
+}
+
+func TestCronWeekly(t *testing.T) {
+	prev := int64(1555351200000000000)
+	result := ""
+	cronTrigger, err := NewCronTrigger("@weekly")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 100)
+	}
+	assertEqual(t, result, "Mon Mar 15 00:00:00 2021")
+}
+
+func TestCronDaily(t *testing.T) {
+	prev := int64(1555351200000000000)
+	result := ""
+	cronTrigger, err := NewCronTrigger("@daily")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 1000)
+	}
+	assertEqual(t, result, "Sun Jan 9 00:00:00 2022")
+}
+
+func TestCronHourly(t *testing.T) {
+	prev := int64(1555351200000000000)
+	result := ""
+	cronTrigger, err := NewCronTrigger("@hourly")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 1000)
+	}
+	assertEqual(t, result, "Wed May 29 06:00:00 2019")
 }
 
 func assertEqual(t *testing.T, a interface{}, b interface{}) {
@@ -95,10 +155,10 @@ func iterate(prev int64, cronTrigger *CronTrigger, iterations int) (string, erro
 	var err error
 	for i := 0; i < iterations; i++ {
 		prev, err = cronTrigger.NextFireTime(prev)
+		// fmt.Println(time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout))
 		if err != nil {
 			return "", err
 		}
-		// fmt.Println(time.Unix(prev, 0).Format(time.UnixDate))
 	}
-	return time.Unix(prev, 0).Format(time.UnixDate), nil
+	return time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout), nil
 }
