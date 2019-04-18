@@ -2,6 +2,7 @@ package quartz
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"time"
 )
@@ -132,4 +133,10 @@ func NowNano() int64 {
 
 func isOutdated(_time int64) bool {
 	return _time < NowNano()-(time.Second*30).Nanoseconds()
+}
+
+func HashCode(s string) int {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return int(h.Sum32())
 }
