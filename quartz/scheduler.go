@@ -99,6 +99,9 @@ func (sched *StdScheduler) calculateNextTick() <-chan time.Time {
 }
 
 func (sched *StdScheduler) executeAndReschedule() {
+	if sched.queueLen() == 0 {
+		return
+	}
 	//fetch item
 	sched.Lock()
 	item := heap.Pop(sched.Queue).(*Item)
