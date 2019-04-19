@@ -10,13 +10,25 @@ Job interface. Should be implemented by custom jobs for further scheduling
 type Job interface {
 	Execute()
 	Description() string
+	Key() int
 }
 ```
 Scheduler interface
 ```go
 type Scheduler interface {
+	//start scheduler
 	Start()
+	//schedule Job with given Trigger
 	ScheduleJob(job Job, trigger Trigger) error
+	//get all scheduled Job keys
+	GetJobKeys() []int
+	//get scheduled Job metadata
+	GetScheduledJob(key int) (*ScheduledJob, error)
+	//remove Job from execution queue
+	DeleteJob(key int) error
+	//clear all scheduled jobs
+	Clear()
+	//shutdown scheduler
 	Stop()
 }
 ```
