@@ -2,6 +2,7 @@ package quartz
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -10,11 +11,29 @@ import (
 type Job interface {
 	Execute()
 	Description() string
+	Key() int
+}
+
+type ScheduledJob struct {
+	Job                Job
+	TriggerDescription string
+	NextRunTime        int64
 }
 
 type Scheduler interface {
+	//start scheduler
 	Start()
+	//schedule Job with given Trigger
 	ScheduleJob(job Job, trigger Trigger) error
+	//get all scheduled Job keys
+	GetJobKeys() []int
+	//get scheduled Job metadata
+	GetScheduledJob(key int) (*ScheduledJob, error)
+	//remove Job from execution queue
+	DeleteJob(key int) error
+	//clear all scheduled jobs
+	Clear()
+	//shutdown scheduler
 	Stop()
 }
 
@@ -36,7 +55,7 @@ func NewStdScheduler() *StdScheduler {
 }
 
 func (sched *StdScheduler) ScheduleJob(job Job, trigger Trigger) error {
-	nextRunTime, err := trigger.NextFireTime(time.Now().UTC().UnixNano())
+	nextRunTime, err := trigger.NextFireTime(NowNano())
 	if err == nil {
 		sched.feeder <- &Item{
 			job,
@@ -55,6 +74,50 @@ func (sched *StdScheduler) Start() {
 	go sched.startFeedReader()
 	//start scheduler execution loop
 	go sched.startExecutionLoop()
+}
+
+func (sched *StdScheduler) GetJobKeys() []int {
+	sched.Lock()
+	defer sched.Unlock()
+	keys := make([]int, 0, sched.Queue.Len())
+	for _, item := range *sched.Queue {
+		keys = append(keys, item.Job.Key())
+	}
+	return keys
+}
+
+func (sched *StdScheduler) GetScheduledJob(key int) (*ScheduledJob, error) {
+	sched.Lock()
+	defer sched.Unlock()
+	for _, item := range *sched.Queue {
+		if item.Job.Key() == key {
+			return &ScheduledJob{
+				item.Job,
+				item.Trigger.Description(),
+				item.priority,
+			}, nil
+		}
+	}
+	return nil, errors.New("No Job with given Key found")
+}
+
+func (sched *StdScheduler) DeleteJob(key int) error {
+	sched.Lock()
+	defer sched.Unlock()
+	for _, item := range *sched.Queue {
+		if item.Job.Key() == key {
+			sched.Queue.Pop()
+			sched.reset()
+			return nil
+		}
+	}
+	return errors.New("No Job with given Key found")
+}
+
+func (sched *StdScheduler) Clear() {
+	sched.Lock()
+	defer sched.Unlock()
+	sched.Queue = &PriorityQueue{}
 }
 
 func (sched *StdScheduler) Stop() {
@@ -99,12 +162,17 @@ func (sched *StdScheduler) calculateNextTick() <-chan time.Time {
 }
 
 func (sched *StdScheduler) executeAndReschedule() {
+	if sched.queueLen() == 0 {
+		return
+	}
 	//fetch item
 	sched.Lock()
 	item := heap.Pop(sched.Queue).(*Item)
 	sched.Unlock()
 	//execute Job
-	go item.Job.Execute()
+	if !isOutdated(item.priority) {
+		go item.Job.Execute()
+	}
 	//reschedule Job
 	nextRunTime, err := item.Trigger.NextFireTime(item.priority)
 	if err == nil {
@@ -119,10 +187,7 @@ func (sched *StdScheduler) startFeedReader() {
 		case item := <-sched.feeder:
 			sched.Lock()
 			heap.Push(sched.Queue, item)
-			select {
-			case sched.interrupt <- struct{}{}:
-			default:
-			}
+			sched.reset()
 			sched.Unlock()
 		case <-sched.exit:
 			fmt.Println("Exit feed reader")
@@ -131,8 +196,15 @@ func (sched *StdScheduler) startFeedReader() {
 	}
 }
 
+func (sched *StdScheduler) reset() {
+	select {
+	case sched.interrupt <- struct{}{}:
+	default:
+	}
+}
+
 func parkTime(ts int64) int64 {
-	now := time.Now().UTC().UnixNano()
+	now := NowNano()
 	if ts > now {
 		return ts - now
 	}

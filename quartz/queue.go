@@ -45,7 +45,7 @@ func (pq *PriorityQueue) Head() *Item {
 	return (*pq)[0]
 }
 
-func (pq *PriorityQueue) Update(item *Item, sleepTime int64) {
-	item.priority = sleepTime
+func (pq *PriorityQueue) Update(item *Item, nextRunTime int64) {
+	item.priority = nextRunTime
 	heap.Fix(pq, item.index)
 }

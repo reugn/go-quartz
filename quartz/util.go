@@ -2,7 +2,9 @@ package quartz
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strconv"
+	"time"
 )
 
 func indexes(search []string, target []string) []int {
@@ -123,4 +125,18 @@ func dayOfTheWeek(y int, m int, d int) string {
 		y--
 	}
 	return days[((y + y/4 - y/100 + y/400 + t[m-1] + d) % 7)]
+}
+
+func NowNano() int64 {
+	return time.Now().UTC().UnixNano()
+}
+
+func isOutdated(_time int64) bool {
+	return _time < NowNano()-(time.Second*30).Nanoseconds()
+}
+
+func HashCode(s string) int {
+	h := fnv.New32a()
+	h.Write([]byte(s))
+	return int(h.Sum32())
 }
