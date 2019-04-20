@@ -8,12 +8,6 @@ import (
 	"time"
 )
 
-type Job interface {
-	Execute()
-	Description() string
-	Key() int
-}
-
 type ScheduledJob struct {
 	Job                Job
 	TriggerDescription string
