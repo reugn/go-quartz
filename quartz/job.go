@@ -92,6 +92,7 @@ func (cu *CurlJob) Execute() {
 	resp, err := client.Do(cu.request)
 	if err != nil {
 		cu.JobStatus = FAILURE
+		cu.StatusCode = -1
 		cu.Response = err.Error()
 		return
 	}
