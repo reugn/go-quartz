@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"go-quartz/quartz"
+	"github.com/reugn/go-quartz/quartz"
 )
 
 //demo main

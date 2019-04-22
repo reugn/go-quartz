@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"go-quartz/quartz"
+
+	"github.com/reugn/go-quartz/quartz"
 )
 
 //implements quartz.Job interface
