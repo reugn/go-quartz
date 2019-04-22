@@ -13,6 +13,10 @@ type Job interface {
 	Key() int
 }
 ```
+Implemented Jobs
+- ShellJob
+- CurlJob
+
 Scheduler interface
 ```go
 type Scheduler interface {
@@ -48,7 +52,17 @@ Implemented Triggers
 - RunOnceTrigger
 
 ## Examples
-Could be found in examples directory.
+```go
+sched := quartz.NewStdScheduler()
+sched.Start()
+cronTrigger, _ := quartz.NewCronTrigger("1/5 * * * * *")
+shellJob := quartz.NewShellJob("ls -la")
+curlJob, _ := quartz.NewCurlJob(http.MethodGet, "http://worldclockapi.com/api/json/est/now", "", nil)
+sched.ScheduleJob(shellJob, cronTrigger)
+sched.ScheduleJob(curlJob, quartz.NewSimpleTrigger(time.Second*7))
+sched.Stop()
+```
+More could be found in the examples directory.
 
 ## License
 Licensed under the MIT License.
