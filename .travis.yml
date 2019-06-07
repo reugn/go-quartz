@@ -1,0 +1,16 @@
+language: go
+
+go:
+  - "1.12"
+
+env:
+  - GO111MODULE=on
+
+notifications:
+  email: false
+
+script:
+  - go mod vendor && go test ./... -race -coverprofile=coverage.txt -covermode=atomic
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
