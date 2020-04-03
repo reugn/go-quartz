@@ -98,7 +98,7 @@ func (cu *CurlJob) Execute() {
 	}
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
-	if cu.StatusCode >= 200 && cu.StatusCode < 300 {
+	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		cu.JobStatus = OK
 	} else {
 		cu.JobStatus = FAILURE
