@@ -1,8 +1,10 @@
 # go-quartz
 [![Build Status](https://travis-ci.org/reugn/go-quartz.svg?branch=master)](https://travis-ci.org/reugn/go-quartz)
+[![GoDoc](https://godoc.org/github.com/reugn/go-quartz/quartz?status.svg)](https://godoc.org/github.com/reugn/go-quartz/quartz)
 [![Go Report Card](https://goreportcard.com/badge/github.com/reugn/go-quartz)](https://goreportcard.com/report/github.com/reugn/go-quartz)
+[![codecov](https://codecov.io/gh/reugn/go-quartz/branch/master/graph/badge.svg)](https://codecov.io/gh/reugn/go-quartz)
 
-A go scheduling library
+Simple, zero-dependency scheduling library for Go
 
 ## About
 Inspired by [quartz](https://github.com/quartz-scheduler/quartz) java scheduler.
