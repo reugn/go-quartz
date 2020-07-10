@@ -9,39 +9,64 @@ import (
 	"time"
 )
 
+// CronTrigger implements the quartz.Trigger interface.
+// Used to fire a Job at given moments in time, defined with Unix 'cron-like' schedule definitions.
+//
+// Examples:
+//
+// Expression 	  			Meaning
+// "0 0 12 * * ?" 	  		Fire at 12pm (noon) every day
+// "0 15 10 ? * *" 	  		Fire at 10:15am every day
+// "0 15 10 * * ?" 	  		Fire at 10:15am every day
+// "0 15 10 * * ? *" 	  	Fire at 10:15am every day
+// "0 15 10 * * ? 2005" 	Fire at 10:15am every day during the year 2005
+// "0 * 14 * * ?" 	  		Fire every minute starting at 2pm and ending at 2:59pm, every day
+// "0 0/5 14 * * ?" 	  	Fire every 5 minutes starting at 2pm and ending at 2:55pm, every day
+// "0 0/5 14,18 * * ?" 	  	Fire every 5 minutes starting at 2pm and ending at 2:55pm, AND fire every 5 minutes starting at 6pm and ending at 6:55pm, every day
+// "0 0-5 14 * * ?" 	  	Fire every minute starting at 2pm and ending at 2:05pm, every day
+// "0 10,44 14 ? 3 WED" 	Fire at 2:10pm and at 2:44pm every Wednesday in the month of March.
+// "0 15 10 ? * MON-FRI" 	Fire at 10:15am every Monday, Tuesday, Wednesday, Thursday and Friday
+// "0 15 10 15 * ?" 	  	Fire at 10:15am on the 15th day of every month
 type CronTrigger struct {
 	expression  string
 	fields      []*CronField
 	lastDefined int
 }
 
+// NewCronTrigger returns a new CronTrigger.
 func NewCronTrigger(expr string) (*CronTrigger, error) {
 	fields, err := validateCronExpression(expr)
 	if err != nil {
 		return nil, err
 	}
+
 	lastDefined := -1
 	for i, field := range fields {
 		if len(field.values) > 0 {
 			lastDefined = i
 		}
 	}
+
 	// full wildcard expression
 	if lastDefined == -1 {
 		fields[0].values, _ = fillRange(0, 59)
 	}
+
 	return &CronTrigger{expr, fields, lastDefined}, nil
 }
 
+// NextFireTime returns the next time at which the CronTrigger is scheduled to fire.
 func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 	parser := NewCronExpressionParser(ct.lastDefined)
 	return parser.nextTime(prev, ct.fields)
 }
 
-func (st *CronTrigger) Description() string {
-	return fmt.Sprintf("CronTrigger %s", st.expression)
+// Description returns a CronTrigger description.
+func (ct *CronTrigger) Description() string {
+	return fmt.Sprintf("CronTrigger %s", ct.expression)
 }
 
+// CronExpressionParser parses cron expressions.
 type CronExpressionParser struct {
 	minuteBump bool
 	hourBump   bool
@@ -54,20 +79,24 @@ type CronExpressionParser struct {
 	maxDays     int
 }
 
+// NewCronExpressionParser returns a new CronExpressionParser.
 func NewCronExpressionParser(lastDefined int) *CronExpressionParser {
 	return &CronExpressionParser{false, false, false, false, false, false,
 		lastDefined, 0}
 }
 
+// CronField represents a parsed cron expression as an array.
 type CronField struct {
 	values []int
 }
 
+// isEmpty checks if the CronField values array is empty.
 func (cf *CronField) isEmpty() bool {
 	return len(cf.values) == 0
 }
 
-func (cf *CronField) toString() string {
+// String is the CronField fmt.Stringer implementation.
+func (cf *CronField) String() string {
 	return strings.Trim(strings.Join(strings.Fields(fmt.Sprint(cf.values)), ","), "[]")
 }
 
@@ -76,7 +105,7 @@ var (
 	days        = []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 	daysInMonth = []int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 
-	// pre-defined cron expressions
+	// the pre-defined cron expressions
 	special = map[string]string{
 		"@yearly":  "0 0 0 1 1 *",
 		"@monthly": "0 0 0 1 * *",
@@ -89,8 +118,8 @@ var (
 	writeDateLayout = "Jan 2 15:04:05 2006"
 )
 
-//<second> <minute> <hour> <day-of-month> <month> <day-of-week> <year>
-//<year> field is optional
+// <second> <minute> <hour> <day-of-month> <month> <day-of-week> <year>
+// <year> field is optional
 const (
 	secondIndex = iota
 	minuteIndex
@@ -114,6 +143,7 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 			}
 		}
 	}()
+
 	tfmt := time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout)
 	ttok := strings.Split(strings.Replace(tfmt, "  ", " ", 1), " ")
 	hms := strings.Split(ttok[3], ":")
@@ -133,9 +163,10 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 	return
 }
 
-//the ? wildcard is only used in the day of month and day of week fields
+// the ? wildcard is only used in the day of month and day of week fields
 func validateCronExpression(expression string) ([]*CronField, error) {
 	var tokens []string
+
 	if value, ok := special[expression]; ok {
 		tokens = strings.Split(value, " ")
 	} else {
@@ -154,6 +185,7 @@ func validateCronExpression(expression string) ([]*CronField, error) {
 	if tokens[6] != "*" {
 		return nil, cronError("year field not supported, use asterisk")
 	}
+
 	var err error
 	fields := make([]*CronField, 7)
 	fields[0], err = parseField(tokens[0], 0, 59)
@@ -166,6 +198,7 @@ func validateCronExpression(expression string) ([]*CronField, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return fields, nil
 }
 
@@ -174,11 +207,13 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 	if len(translate) > 0 {
 		tr = translate[0]
 	}
-	//any value
+
+	// any value
 	if field == "*" || field == "?" {
 		return &CronField{[]int{}}, nil
 	}
-	//single value
+
+	// single value
 	i, err := strconv.Atoi(field)
 	if err == nil {
 		if inScope(i, min, max) {
@@ -186,18 +221,20 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 		}
 		return nil, cronError("single min/max validation")
 	}
-	//list of values
+
+	// list of values
 	if strings.Contains(field, ",") {
 		t := strings.Split(field, ",")
 		si, err := sliceAtoi(t)
 		if err != nil {
-			//TODO: translation can fail
+			// TODO: translation can fail
 			si = indexes(t, tr)
 		}
 		sort.Ints(si)
 		return &CronField{si}, nil
 	}
-	//range of values
+
+	// range of values
 	if strings.Contains(field, "-") {
 		var _range []int
 		t := strings.Split(field, "-")
@@ -215,7 +252,8 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 		}
 		return &CronField{_range}, nil
 	}
-	//step values
+
+	// step values
 	if strings.Contains(field, "/") {
 		var _step []int
 		t := strings.Split(field, "/")
@@ -233,7 +271,8 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 		}
 		return &CronField{_step}, nil
 	}
-	//literal single value
+
+	// literal single value
 	if tr != nil {
 		i := intVal(tr, field)
 		if i >= 0 {
@@ -243,6 +282,7 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 			return nil, cronError("literal min/max validation")
 		}
 	}
+
 	return nil, cronError("parse")
 }
 
@@ -275,6 +315,7 @@ func (parser *CronExpressionParser) nextMinutes(prev int, field *CronField) stri
 		}
 		return alignDigit(prev, "0")
 	}
+
 	next, parser.hourBump = parser.findNextValue(prev, field.values)
 	parser.setDone(minuteIndex)
 	return alignDigit(next, "0")
@@ -289,6 +330,7 @@ func (parser *CronExpressionParser) nextHours(prev int, field *CronField) string
 		}
 		return alignDigit(prev, "0")
 	}
+
 	next, parser.dayBump = parser.findNextValue(prev, field.values)
 	parser.setDone(hourIndex)
 	return alignDigit(next, "0")
@@ -304,6 +346,7 @@ func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
 		}
 		return prevMonth
 	}
+
 	if len(monthField.values) > 0 {
 		nextMonth, parser.monthBump = parser.findNextValue(prevMonth, monthField.values)
 		parser.setDone(dayOfMonthIndex)
@@ -332,6 +375,7 @@ func (parser *CronExpressionParser) nextMonth(prev string, field *CronField) str
 		}
 		return prev
 	}
+
 	next, parser.yearBump = parser.findNextValue(intVal(months, prev), field.values)
 	parser.setDone(monthIndex)
 	return months[next]
@@ -346,10 +390,12 @@ func (parser *CronExpressionParser) nextYear(prev string, field *CronField) stri
 		}
 		return prev
 	}
+
 	next, halt := parser.findNextValue(prev, field.values)
 	if halt != false {
 		panic("out of expression range")
 	}
+
 	return strconv.Itoa(next)
 }
 
@@ -361,12 +407,14 @@ func bumpLiteral(iprev int, max int, step int) (int, bool) {
 		}
 		return (bumped % max), true
 	}
+
 	return bumped, false
 }
 
-// return: bumped value, bump next
+// returns bumped value, bump next
 func bumpValue(prev interface{}, max int, step int) (int, bool) {
 	var iprev, bumped int
+
 	switch prev.(type) {
 	case string:
 		iprev, _ = strconv.Atoi(prev.(string))
@@ -375,16 +423,19 @@ func bumpValue(prev interface{}, max int, step int) (int, bool) {
 	default:
 		panic("Unknown type at bumpValue")
 	}
+
 	bumped = iprev + step
 	if bumped > max {
 		return bumped % max, true
 	}
+
 	return bumped, false
 }
 
-// return: next value, bump next
+// returns next value, bump next
 func (parser *CronExpressionParser) findNextValue(prev interface{}, values []int) (int, bool) {
 	var iprev int
+
 	switch prev.(type) {
 	case string:
 		iprev, _ = strconv.Atoi(prev.(string))
@@ -393,9 +444,11 @@ func (parser *CronExpressionParser) findNextValue(prev interface{}, values []int
 	default:
 		panic("Unknown type at findNextValue")
 	}
+
 	if len(values) == 0 {
 		return iprev, false
 	}
+
 	for _, element := range values {
 		if parser.done {
 			if element >= iprev {
@@ -408,5 +461,6 @@ func (parser *CronExpressionParser) findNextValue(prev interface{}, values []int
 			}
 		}
 	}
+
 	return values[0], true
 }
