@@ -11,6 +11,7 @@ func TestCronExpression1(t *testing.T) {
 	prev := int64(1555351200000000000)
 	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("10/20 15 14 5-10 * ? *")
+	cronTrigger.Description()
 	if err != nil {
 		t.Fatal(err)
 	} else {

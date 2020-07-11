@@ -4,10 +4,10 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/reugn/go-quartz)](https://goreportcard.com/report/github.com/reugn/go-quartz)
 [![codecov](https://codecov.io/gh/reugn/go-quartz/branch/master/graph/badge.svg)](https://codecov.io/gh/reugn/go-quartz)
 
-Simple, zero-dependency scheduling library for Go
+Simple, zero-dependency scheduling library for Go.
 
 ## About
-Inspired by [quartz](https://github.com/quartz-scheduler/quartz) java scheduler.
+Inspired by the [Quartz](https://github.com/quartz-scheduler/quartz) Java scheduler.
 
 ### Library building blocks
 Job interface. Should be implemented by custom jobs for further scheduling
@@ -25,19 +25,19 @@ Implemented Jobs
 Scheduler interface
 ```go
 type Scheduler interface {
-	//start scheduler
+	// start the scheduler
 	Start()
-	//schedule Job with given Trigger
+	// schedule the job with the specified trigger
 	ScheduleJob(job Job, trigger Trigger) error
-	//get all scheduled Job keys
+	// get all scheduled jobs keys
 	GetJobKeys() []int
-	//get scheduled Job metadata
+	// get the scheduled job metadata
 	GetScheduledJob(key int) (*ScheduledJob, error)
-	//remove Job from execution queue
+	// remove the job from the execution queue
 	DeleteJob(key int) error
-	//clear all scheduled jobs
+	// clear all scheduled jobs
 	Clear()
-	//shutdown scheduler
+	// shutdown the scheduler
 	Stop()
 }
 ```
@@ -67,7 +67,7 @@ sched.ScheduleJob(shellJob, cronTrigger)
 sched.ScheduleJob(curlJob, quartz.NewSimpleTrigger(time.Second*7))
 sched.Stop()
 ```
-More could be found in the examples directory.
+More code samples could be found in the examples directory.
 
 ## License
 Licensed under the MIT License.

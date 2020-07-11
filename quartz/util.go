@@ -12,6 +12,7 @@ func indexes(search []string, target []string) []int {
 	for _, a := range search {
 		searchIndexes = append(searchIndexes, intVal(target, a))
 	}
+
 	return searchIndexes
 }
 
@@ -22,8 +23,10 @@ func sliceAtoi(sa []string) ([]int, error) {
 		if err != nil {
 			return si, err
 		}
+
 		si = append(si, i)
 	}
+
 	return si, nil
 }
 
@@ -31,11 +34,14 @@ func fillRange(from int, to int) ([]int, error) {
 	if to < from {
 		return nil, cronError("fillRange")
 	}
+
 	len := (to - from) + 1
 	arr := make([]int, len)
+
 	for i, j := from, 0; i <= to; i, j = i+1, j+1 {
 		arr[j] = i
 	}
+
 	return arr, nil
 }
 
@@ -43,11 +49,14 @@ func fillStep(from int, step int, max int) ([]int, error) {
 	if max < from {
 		return nil, cronError("fillStep")
 	}
+
 	len := ((max - from) / step) + 1
 	arr := make([]int, len)
+
 	for i, j := from, 0; i <= max; i, j = i+step, j+1 {
 		arr[j] = i
 	}
+
 	return arr, nil
 }
 
@@ -56,6 +65,7 @@ func normalize(field string, tr []string) int {
 	if err == nil {
 		return i
 	}
+
 	return intVal(tr, field)
 }
 
@@ -63,6 +73,7 @@ func inScope(i int, min int, max int) bool {
 	if i >= min && i <= max {
 		return true
 	}
+
 	return false
 }
 
@@ -70,11 +81,12 @@ func cronError(cause string) error {
 	return fmt.Errorf("Invalid cron expression: %s", cause)
 }
 
-// Align single digit values for time.UnixDate format
+// Align single digit values (for the time.UnixDate format).
 func alignDigit(next int, prefix string) string {
 	if next < 10 {
 		return prefix + strconv.Itoa(next)
 	}
+
 	return strconv.Itoa(next)
 }
 
@@ -83,6 +95,7 @@ func step(prev int, next int, max int) int {
 	if diff < 0 {
 		return diff + max
 	}
+
 	return diff
 }
 
@@ -92,7 +105,8 @@ func intVal(target []string, search string) int {
 			return i
 		}
 	}
-	return -1 //TODO: return error
+
+	return -1 // TODO: return error
 }
 
 // Unsafe strconv.Atoi
@@ -105,6 +119,7 @@ func maxDays(month int, year int) int {
 	if month == 2 && isLeapYear(year) {
 		return 29
 	}
+
 	return daysInMonth[month]
 }
 
@@ -124,9 +139,11 @@ func dayOfTheWeek(y int, m int, d int) string {
 	if m < 3 {
 		y--
 	}
+
 	return days[((y + y/4 - y/100 + y/400 + t[m-1] + d) % 7)]
 }
 
+// NowNano returns the current UTC Unix time in nanoseconds.
 func NowNano() int64 {
 	return time.Now().UTC().UnixNano()
 }
@@ -135,6 +152,7 @@ func isOutdated(_time int64) bool {
 	return _time < NowNano()-(time.Second*30).Nanoseconds()
 }
 
+// HashCode calculates and returns a string parameter hash code.
 func HashCode(s string) int {
 	h := fnv.New32a()
 	h.Write([]byte(s))
