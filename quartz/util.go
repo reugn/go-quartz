@@ -134,15 +134,6 @@ func isLeapYear(year int) bool {
 	return true
 }
 
-func dayOfTheWeek(y int, m int, d int) string {
-	t := []int{0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4}
-	if m < 3 {
-		y--
-	}
-
-	return days[((y + y/4 - y/100 + y/400 + t[m-1] + d) % 7)]
-}
-
 // NowNano returns the current UTC Unix time in nanoseconds.
 func NowNano() int64 {
 	return time.Now().UTC().UnixNano()
