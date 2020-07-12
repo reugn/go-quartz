@@ -14,19 +14,19 @@ import (
 //
 // Examples:
 //
-// Expression 	  			Meaning
-// "0 0 12 * * ?" 	  		Fire at 12pm (noon) every day
-// "0 15 10 ? * *" 	  		Fire at 10:15am every day
-// "0 15 10 * * ?" 	  		Fire at 10:15am every day
-// "0 15 10 * * ? *" 	  	Fire at 10:15am every day
-// "0 15 10 * * ? 2005" 	Fire at 10:15am every day during the year 2005
-// "0 * 14 * * ?" 	  		Fire every minute starting at 2pm and ending at 2:59pm, every day
-// "0 0/5 14 * * ?" 	  	Fire every 5 minutes starting at 2pm and ending at 2:55pm, every day
-// "0 0/5 14,18 * * ?" 	  	Fire every 5 minutes starting at 2pm and ending at 2:55pm, AND fire every 5 minutes starting at 6pm and ending at 6:55pm, every day
-// "0 0-5 14 * * ?" 	  	Fire every minute starting at 2pm and ending at 2:05pm, every day
-// "0 10,44 14 ? 3 WED" 	Fire at 2:10pm and at 2:44pm every Wednesday in the month of March.
-// "0 15 10 ? * MON-FRI" 	Fire at 10:15am every Monday, Tuesday, Wednesday, Thursday and Friday
-// "0 15 10 15 * ?" 	  	Fire at 10:15am on the 15th day of every month
+// Expression               Meaning
+// "0 0 12 * * ?"           Fire at 12pm (noon) every day
+// "0 15 10 ? * *"          Fire at 10:15am every day
+// "0 15 10 * * ?"          Fire at 10:15am every day
+// "0 15 10 * * ? *"        Fire at 10:15am every day
+// "0 * 14 * * ?"           Fire every minute starting at 2pm and ending at 2:59pm, every day
+// "0 0/5 14 * * ?"         Fire every 5 minutes starting at 2pm and ending at 2:55pm, every day
+// "0 0/5 14,18 * * ?"      Fire every 5 minutes starting at 2pm and ending at 2:55pm,
+//                          AND fire every 5 minutes starting at 6pm and ending at 6:55pm, every day
+// "0 0-5 14 * * ?"         Fire every minute starting at 2pm and ending at 2:05pm, every day
+// "0 10,44 14 ? 3 WED"     Fire at 2:10pm and at 2:44pm every Wednesday in the month of March.
+// "0 15 10 ? * MON-FRI"    Fire at 10:15am every Monday, Tuesday, Wednesday, Thursday and Friday
+// "0 15 10 15 * ?"         Fire at 10:15am on the 15th day of every month
 type CronTrigger struct {
 	expression  string
 	fields      []*CronField
@@ -174,26 +174,54 @@ func validateCronExpression(expression string) ([]*CronField, error) {
 	}
 	length := len(tokens)
 	if length < 6 || length > 7 {
-		return nil, cronError("length")
+		return nil, cronError("Invalid expression length")
 	}
 	if length == 6 {
 		tokens = append(tokens, "*")
 	}
 	if (tokens[3] != "?" && tokens[3] != "*") && (tokens[5] != "?" && tokens[5] != "*") {
-		return nil, cronError("day field set twice")
+		return nil, cronError("Day field was set twice")
 	}
 	if tokens[6] != "*" {
-		return nil, cronError("year field not supported, use asterisk")
+		return nil, cronError("Year field is not supported, use asterisk") // TODO: support year field
 	}
 
+	return buildCronField(tokens)
+}
+
+func buildCronField(tokens []string) ([]*CronField, error) {
 	var err error
 	fields := make([]*CronField, 7)
 	fields[0], err = parseField(tokens[0], 0, 59)
+	if err != nil {
+		return nil, err
+	}
+
 	fields[1], err = parseField(tokens[1], 0, 59)
+	if err != nil {
+		return nil, err
+	}
+
 	fields[2], err = parseField(tokens[2], 0, 23)
+	if err != nil {
+		return nil, err
+	}
+
 	fields[3], err = parseField(tokens[3], 1, 31)
+	if err != nil {
+		return nil, err
+	}
+
 	fields[4], err = parseField(tokens[4], 1, 12, months)
+	if err != nil {
+		return nil, err
+	}
+
 	fields[5], err = parseField(tokens[5], 0, 6, days)
+	if err != nil {
+		return nil, err
+	}
+
 	fields[6], err = parseField(tokens[6], 1970, 1970*2)
 	if err != nil {
 		return nil, err
@@ -219,57 +247,22 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 		if inScope(i, min, max) {
 			return &CronField{[]int{i}}, nil
 		}
-		return nil, cronError("single min/max validation")
+		return nil, cronError("Single min/max validation error")
 	}
 
-	// list of values
+	// list values
 	if strings.Contains(field, ",") {
-		t := strings.Split(field, ",")
-		si, err := sliceAtoi(t)
-		if err != nil {
-			// TODO: translation can fail
-			si = indexes(t, tr)
-		}
-		sort.Ints(si)
-		return &CronField{si}, nil
+		return parseListField(field, tr)
 	}
 
-	// range of values
+	// range values
 	if strings.Contains(field, "-") {
-		var _range []int
-		t := strings.Split(field, "-")
-		if len(t) != 2 {
-			return nil, cronError("parse range")
-		}
-		from := normalize(t[0], tr)
-		to := normalize(t[1], tr)
-		if !inScope(from, min, max) || !inScope(to, min, max) {
-			return nil, cronError("range min/max validation")
-		}
-		_range, err = fillRange(from, to)
-		if err != nil {
-			return nil, err
-		}
-		return &CronField{_range}, nil
+		return parseRangeField(field, min, max, tr)
 	}
 
 	// step values
 	if strings.Contains(field, "/") {
-		var _step []int
-		t := strings.Split(field, "/")
-		if len(t) != 2 {
-			return nil, cronError("parse step")
-		}
-		from := normalize(t[0], tr)
-		step := atoi(t[1])
-		if !inScope(from, min, max) {
-			return nil, cronError("step min/max validation")
-		}
-		_step, err = fillStep(from, step, max)
-		if err != nil {
-			return nil, err
-		}
-		return &CronField{_step}, nil
+		return parseStepField(field, min, max, tr)
 	}
 
 	// literal single value
@@ -279,11 +272,65 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 			if inScope(i, min, max) {
 				return &CronField{[]int{i}}, nil
 			}
-			return nil, cronError("literal min/max validation")
+			return nil, cronError("Cron literal min/max validation error")
 		}
 	}
 
-	return nil, cronError("parse")
+	return nil, cronError("Cron parse error")
+}
+
+func parseListField(field string, translate []string) (*CronField, error) {
+	t := strings.Split(field, ",")
+	si, err := sliceAtoi(t)
+	if err != nil {
+		// TODO: translation can fail
+		si = indexes(t, translate)
+	}
+
+	sort.Ints(si)
+	return &CronField{si}, nil
+}
+
+func parseRangeField(field string, min int, max int, translate []string) (*CronField, error) {
+	var _range []int
+	t := strings.Split(field, "-")
+	if len(t) != 2 {
+		return nil, cronError("Parse cron range error")
+	}
+
+	from := normalize(t[0], translate)
+	to := normalize(t[1], translate)
+	if !inScope(from, min, max) || !inScope(to, min, max) {
+		return nil, cronError("Cron range min/max validation error")
+	}
+
+	_range, err := fillRange(from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CronField{_range}, nil
+}
+
+func parseStepField(field string, min int, max int, translate []string) (*CronField, error) {
+	var _step []int
+	t := strings.Split(field, "/")
+	if len(t) != 2 {
+		return nil, cronError("Parse cron step error")
+	}
+
+	from := normalize(t[0], translate)
+	step := atoi(t[1])
+	if !inScope(from, min, max) {
+		return nil, cronError("Cron step min/max validation error")
+	}
+
+	_step, err := fillStep(from, step, max)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CronField{_step}, nil
 }
 
 func (parser *CronExpressionParser) setDone(index int) {
@@ -393,7 +440,7 @@ func (parser *CronExpressionParser) nextYear(prev string, field *CronField) stri
 
 	next, halt := parser.findNextValue(prev, field.values)
 	if halt != false {
-		panic("out of expression range")
+		panic("Out of expression range error")
 	}
 
 	return strconv.Itoa(next)
