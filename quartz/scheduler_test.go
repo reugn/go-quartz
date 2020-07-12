@@ -22,19 +22,20 @@ func TestScheduler(t *testing.T) {
 	jobKeys[1] = curlJob.Key()
 
 	sched.Start()
-	sched.ScheduleJob(shellJob, quartz.NewRunOnceTrigger(time.Microsecond))
-	sched.ScheduleJob(curlJob, quartz.NewRunOnceTrigger(time.Microsecond))
+	sched.ScheduleJob(shellJob, quartz.NewSimpleTrigger(time.Millisecond*800))
+	sched.ScheduleJob(curlJob, quartz.NewRunOnceTrigger(time.Millisecond))
 
 	time.Sleep(time.Second)
 	scheduledJobKeys := sched.GetJobKeys()
-	assertEqual(t, scheduledJobKeys, []int{})
+	assertEqual(t, scheduledJobKeys, []int{3059422767})
 
 	_, err = sched.GetScheduledJob(jobKeys[0])
-	if err == nil {
+	if err != nil {
 		t.Fail()
 	}
+
 	err = sched.DeleteJob(jobKeys[0])
-	if err == nil {
+	if err != nil {
 		t.Fail()
 	}
 
