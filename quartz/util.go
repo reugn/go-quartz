@@ -7,13 +7,17 @@ import (
 	"time"
 )
 
-func indexes(search []string, target []string) []int {
+func indexes(search []string, target []string) ([]int, error) {
 	searchIndexes := make([]int, 0, len(search))
 	for _, a := range search {
-		searchIndexes = append(searchIndexes, intVal(target, a))
+		index := intVal(target, a)
+		if index == -1 {
+			return nil, fmt.Errorf("Invalid cron field: %s", a)
+		}
+		searchIndexes = append(searchIndexes, index)
 	}
 
-	return searchIndexes
+	return searchIndexes, nil
 }
 
 func sliceAtoi(sa []string) ([]int, error) {

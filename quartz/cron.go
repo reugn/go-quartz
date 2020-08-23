@@ -231,9 +231,9 @@ func buildCronField(tokens []string) ([]*CronField, error) {
 }
 
 func parseField(field string, min int, max int, translate ...[]string) (*CronField, error) {
-	var tr []string
+	var dict []string
 	if len(translate) > 0 {
-		tr = translate[0]
+		dict = translate[0]
 	}
 
 	// any value
@@ -252,22 +252,22 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 
 	// list values
 	if strings.Contains(field, ",") {
-		return parseListField(field, tr)
+		return parseListField(field, dict)
 	}
 
 	// range values
 	if strings.Contains(field, "-") {
-		return parseRangeField(field, min, max, tr)
+		return parseRangeField(field, min, max, dict)
 	}
 
 	// step values
 	if strings.Contains(field, "/") {
-		return parseStepField(field, min, max, tr)
+		return parseStepField(field, min, max, dict)
 	}
 
 	// literal single value
-	if tr != nil {
-		i := intVal(tr, field)
+	if dict != nil {
+		i := intVal(dict, field)
 		if i >= 0 {
 			if inScope(i, min, max) {
 				return &CronField{[]int{i}}, nil
@@ -283,8 +283,10 @@ func parseListField(field string, translate []string) (*CronField, error) {
 	t := strings.Split(field, ",")
 	si, err := sliceAtoi(t)
 	if err != nil {
-		// TODO: translation can fail
-		si = indexes(t, translate)
+		si, err = indexes(t, translate)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	sort.Ints(si)
