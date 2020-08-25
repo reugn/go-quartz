@@ -13,22 +13,22 @@ type Item struct {
 // PriorityQueue implements the heap.Interface.
 type PriorityQueue []*Item
 
-// Len returns a PriorityQueue length.
+// Len returns the PriorityQueue length.
 func (pq PriorityQueue) Len() int { return len(pq) }
 
-// Less is the arguments less comparator.
+// Less is the items less comparator.
 func (pq PriorityQueue) Less(i, j int) bool {
 	return pq[i].priority < pq[j].priority
 }
 
-// Swap exchanges the values of the arguments.
+// Swap exchanges the indexes of the items.
 func (pq PriorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 	pq[i].index = i
 	pq[j].index = j
 }
 
-// Push implements the heap.Interface.PushPush.
+// Push implements the heap.Interface.Push.
 // Adds x as element Len().
 func (pq *PriorityQueue) Push(x interface{}) {
 	n := len(*pq)
