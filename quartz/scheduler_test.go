@@ -34,10 +34,11 @@ func TestScheduler(t *testing.T) {
 		t.Fail()
 	}
 
-	err = sched.DeleteJob(jobKeys[0])
+	err = sched.DeleteJob(shellJob.Key())
 	if err != nil {
 		t.Fail()
 	}
+	assertEqual(t, sched.Queue.Len(), 0)
 
 	sched.Clear()
 	sched.Stop()

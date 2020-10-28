@@ -114,10 +114,9 @@ func (sched *StdScheduler) DeleteJob(key int) error {
 	sched.Lock()
 	defer sched.Unlock()
 
-	for _, item := range *sched.Queue {
+	for i, item := range *sched.Queue {
 		if item.Job.Key() == key {
-			sched.Queue.Pop()
-			sched.reset()
+			sched.Queue.Remove(i)
 			return nil
 		}
 	}

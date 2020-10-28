@@ -53,8 +53,7 @@ func (pq *PriorityQueue) Head() *Item {
 	return (*pq)[0]
 }
 
-// Update sets the item's priority and calls the heap.Fix to re-establish the heap ordering.
-func (pq *PriorityQueue) Update(item *Item, nextRunTime int64) {
-	item.priority = nextRunTime
-	heap.Fix(pq, item.index)
+// Remove removes and returns the element at index i from the PriorityQueue.
+func (pq *PriorityQueue) Remove(i int) interface{} {
+	return heap.Remove(pq, i)
 }
