@@ -10,7 +10,7 @@ Simple, zero-dependency scheduling library for Go.
 Inspired by the [Quartz](https://github.com/quartz-scheduler/quartz) Java scheduler.
 
 ### Library building blocks
-Job interface. Should be implemented by custom jobs for further scheduling
+Job interface. Any type that implements it can be scheduled.
 ```go
 type Job interface {
 	Execute()
@@ -67,7 +67,7 @@ sched.ScheduleJob(shellJob, cronTrigger)
 sched.ScheduleJob(curlJob, quartz.NewSimpleTrigger(time.Second*7))
 sched.Stop()
 ```
-More code samples could be found in the examples directory.
+More code samples can be found in the examples directory.
 
 ## License
 Licensed under the MIT License.
