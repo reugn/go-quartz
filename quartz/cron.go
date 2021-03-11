@@ -404,6 +404,10 @@ func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
 		nextWeek, bumpDayOfMonth := parser.findNextValue(prevWeek, weekField.values)
 		parser.setDone(dayOfWeekIndex)
 		var _step int
+		if len(weekField.values) == 1 && weekField.values[0] < prevWeek {
+			bumpDayOfMonth = false
+		}
+
 		if bumpDayOfMonth && len(weekField.values) == 1 {
 			_step = 7
 		} else {
