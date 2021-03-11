@@ -1,6 +1,8 @@
 package quartz_test
 
 import (
+	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -88,6 +90,41 @@ func TestCronExpression7(t *testing.T) {
 	assertEqual(t, result, "Tue Jul 16 16:09:00 2019")
 }
 
+func TestCronDaysOfWeek(t *testing.T) {
+	daysOfWeek := []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
+	expected := []string{
+		"Sun Apr 21 00:00:00 2019",
+		"Mon Apr 22 00:00:00 2019",
+		"Tue Apr 23 00:00:00 2019",
+		"Wed Apr 24 00:00:00 2019",
+		"Thu Apr 18 00:00:00 2019",
+		"Fri Apr 19 00:00:00 2019",
+		"Sat Apr 20 00:00:00 2019",
+	}
+
+	for i := 0; i < len(daysOfWeek); i++ {
+		cronDayOfWeek(t, daysOfWeek[i], expected[i])
+		cronDayOfWeek(t, strconv.Itoa(i), expected[i])
+	}
+}
+
+func cronDayOfWeek(t *testing.T, dayOfWeek, expected string) {
+	prev := int64(1555524000000000000) // Wed Apr 17 18:00:00 2019
+	expression := fmt.Sprintf("0 0 0 * * %s", dayOfWeek)
+	cronTrigger, err := quartz.NewCronTrigger(expression)
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		nextFireTime, err := cronTrigger.NextFireTime(prev)
+		if err != nil {
+			t.Fatal(err)
+		} else {
+			assertEqual(t, time.Unix(nextFireTime/int64(time.Second), 0).UTC().Format(readDateLayout),
+				expected)
+		}
+	}
+}
+
 func TestCronYearly(t *testing.T) {
 	prev := int64(1555351200000000000)
 	result := ""
@@ -121,7 +158,7 @@ func TestCronWeekly(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 100)
 	}
-	assertEqual(t, result, "Mon Mar 15 00:00:00 2021")
+	assertEqual(t, result, "Sun Mar 14 00:00:00 2021")
 }
 
 func TestCronDaily(t *testing.T) {
