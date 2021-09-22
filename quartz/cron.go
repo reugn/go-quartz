@@ -321,6 +321,10 @@ func parseStepField(field string, min int, max int, translate []string) (*CronFi
 		return nil, cronError("Parse cron step error")
 	}
 
+	if t[0] == "*" {
+		t[0] = "0"
+	}
+
 	from := normalize(t[0], translate)
 	step := atoi(t[1])
 	if !inScope(from, min, max) {

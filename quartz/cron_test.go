@@ -90,6 +90,18 @@ func TestCronExpression7(t *testing.T) {
 	assertEqual(t, result, "Tue Jul 16 16:09:00 2019")
 }
 
+func TestCronExpression8(t *testing.T) {
+	prev := int64(1555351200000000000)
+	result := ""
+	cronTrigger, err := quartz.NewCronTrigger("0 51 */12 * * ? *")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 1000)
+	}
+	assertEqual(t, result, "Thu Aug 27 12:51:00 2020")
+}
+
 func TestCronDaysOfWeek(t *testing.T) {
 	daysOfWeek := []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 	expected := []string{
