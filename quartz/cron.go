@@ -322,7 +322,7 @@ func parseStepField(field string, min int, max int, translate []string) (*CronFi
 	}
 
 	if t[0] == "*" {
-		t[0] = "0"
+		t[0] = strconv.Itoa(min)
 	}
 
 	from := normalize(t[0], translate)

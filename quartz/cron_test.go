@@ -93,13 +93,13 @@ func TestCronExpression7(t *testing.T) {
 func TestCronExpression8(t *testing.T) {
 	prev := int64(1555351200000000000)
 	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("0 51 */12 * * ? *")
+	cronTrigger, err := quartz.NewCronTrigger("*/3 */51 */12 */2 */4 ? *")
 	if err != nil {
 		t.Fatal(err)
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Thu Aug 27 12:51:00 2020")
+	assertEqual(t, result, "Sat Sep 7 12:00:00 2019")
 }
 
 func TestCronDaysOfWeek(t *testing.T) {
