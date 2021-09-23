@@ -38,8 +38,8 @@ type Scheduler interface {
 type StdScheduler struct {
 	sync.Mutex
 	Queue     *PriorityQueue
-	interrupt chan interface{}
-	exit      chan interface{}
+	interrupt chan struct{}
+	exit      chan struct{}
 	feeder    chan *Item
 }
 
@@ -47,7 +47,7 @@ type StdScheduler struct {
 func NewStdScheduler() *StdScheduler {
 	return &StdScheduler{
 		Queue:     &PriorityQueue{},
-		interrupt: make(chan interface{}),
+		interrupt: make(chan struct{}, 1),
 		exit:      nil,
 		feeder:    make(chan *Item)}
 }
@@ -71,7 +71,7 @@ func (sched *StdScheduler) ScheduleJob(job Job, trigger Trigger) error {
 // Start starts the StdScheduler execution loop.
 func (sched *StdScheduler) Start() {
 	// reset the exit channel
-	sched.exit = make(chan interface{})
+	sched.exit = make(chan struct{})
 	// start the feed reader
 	go sched.startFeedReader()
 	// start scheduler execution loop
