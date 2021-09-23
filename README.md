@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/reugn/go-quartz)](https://goreportcard.com/report/github.com/reugn/go-quartz)
 [![codecov](https://codecov.io/gh/reugn/go-quartz/branch/master/graph/badge.svg)](https://codecov.io/gh/reugn/go-quartz)
 
-Simple, zero-dependency scheduling library for Go.
+A minimalistic and zero-dependency scheduling library for Go.
 
 ## About
 Inspired by the [Quartz](https://github.com/quartz-scheduler/quartz) Java scheduler.
@@ -27,6 +27,8 @@ Scheduler interface
 type Scheduler interface {
 	// start the scheduler
 	Start()
+	// whether the scheduler has been started
+	IsStarted() bool
 	// schedule the job with the specified trigger
 	ScheduleJob(job Job, trigger Trigger) error
 	// get all scheduled jobs keys
