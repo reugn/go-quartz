@@ -449,7 +449,7 @@ func (parser *CronExpressionParser) nextYear(prev string, field *CronField) stri
 	}
 
 	next, halt := parser.findNextValue(prev, field.values)
-	if halt != false {
+	if halt {
 		panic("Out of expression range error")
 	}
 
