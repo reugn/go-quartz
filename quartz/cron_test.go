@@ -194,7 +194,7 @@ func TestCronHourly(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Wed May 29 06:00:00 2019")
+	assertEqual(t, result, "Mon May 27 10:00:00 2019")
 }
 
 var readDateLayout = "Mon Jan 2 15:04:05 2006"
@@ -205,6 +205,7 @@ func iterate(prev int64, cronTrigger *quartz.CronTrigger, iterations int) (strin
 		prev, err = cronTrigger.NextFireTime(prev)
 		// fmt.Println(time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout))
 		if err != nil {
+			fmt.Println(err)
 			return "", err
 		}
 	}

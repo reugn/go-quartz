@@ -356,37 +356,37 @@ func (parser *CronExpressionParser) nextSeconds(prev int, field *CronField) stri
 	var next int
 	next, parser.minuteBump = parser.findNextValue(prev, field.values)
 	parser.setDone(secondIndex)
-	return alignDigit(next, "0")
+	return alignDigit(next)
 }
 
 func (parser *CronExpressionParser) nextMinutes(prev int, field *CronField) string {
 	var next int
 	if field.isEmpty() && parser.lastSet(minuteIndex) {
 		if parser.minuteBump {
-			next, parser.hourBump = bumpValue(prev, 59, 1)
-			return alignDigit(next, "0")
+			next, parser.hourBump = bumpValue(prev, 59, 1, true)
+			return alignDigit(next)
 		}
-		return alignDigit(prev, "0")
+		return alignDigit(prev)
 	}
 
 	next, parser.hourBump = parser.findNextValue(prev, field.values)
 	parser.setDone(minuteIndex)
-	return alignDigit(next, "0")
+	return alignDigit(next)
 }
 
 func (parser *CronExpressionParser) nextHours(prev int, field *CronField) string {
 	var next int
 	if field.isEmpty() && parser.lastSet(hourIndex) {
 		if parser.hourBump {
-			next, parser.dayBump = bumpValue(prev, 23, 1)
-			return alignDigit(next, "0")
+			next, parser.dayBump = bumpValue(prev, 23, 1, true)
+			return alignDigit(next)
 		}
-		return alignDigit(prev, "0")
+		return alignDigit(prev)
 	}
 
 	next, parser.dayBump = parser.findNextValue(prev, field.values)
 	parser.setDone(hourIndex)
-	return alignDigit(next, "0")
+	return alignDigit(next)
 }
 
 func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
@@ -394,7 +394,7 @@ func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
 	var nextMonth int
 	if weekField.isEmpty() && monthField.isEmpty() && parser.lastSet(dayOfWeekIndex) {
 		if parser.dayBump {
-			nextMonth, parser.monthBump = bumpValue(prevMonth, parser.maxDays, 1)
+			nextMonth, parser.monthBump = bumpValue(prevMonth, parser.maxDays, 1, false)
 			return nextMonth
 		}
 		return prevMonth
@@ -417,7 +417,7 @@ func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
 		} else {
 			_step = step(prevWeek, nextWeek, 7)
 		}
-		nextMonth, parser.monthBump = bumpValue(prevMonth, parser.maxDays, _step)
+		nextMonth, parser.monthBump = bumpValue(prevMonth, parser.maxDays, _step, false)
 		return nextMonth
 	}
 	return prevMonth
@@ -442,7 +442,7 @@ func (parser *CronExpressionParser) nextYear(prev string, field *CronField) stri
 	var next int
 	if field.isEmpty() && parser.lastSet(yearIndex) {
 		if parser.yearBump {
-			next, _ = bumpValue(prev, int(^uint(0)>>1), 1)
+			next, _ = bumpValue(prev, int(^uint(0)>>1), 1, false)
 			return strconv.Itoa(next)
 		}
 		return prev
@@ -469,7 +469,7 @@ func bumpLiteral(iprev int, max int, step int) (int, bool) {
 }
 
 // returns bumped value, bump next
-func bumpValue(prev interface{}, max int, step int) (int, bool) {
+func bumpValue(prev interface{}, max, step int, zero bool) (int, bool) {
 	var iprev, bumped int
 
 	switch prev.(type) {
@@ -483,6 +483,9 @@ func bumpValue(prev interface{}, max int, step int) (int, bool) {
 
 	bumped = iprev + step
 	if bumped > max {
+		if zero {
+			return 0, true
+		}
 		return bumped % max, true
 	}
 
