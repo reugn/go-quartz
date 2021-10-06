@@ -81,7 +81,7 @@ func TestCronExpression6(t *testing.T) {
 func TestCronExpression7(t *testing.T) {
 	prev := int64(1555351200000000000)
 	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("* 5-9 14/2 * * 0-2 *")
+	cronTrigger, err := quartz.NewCronTrigger("* 5-9 14/2 * * 1-3 *")
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -116,7 +116,7 @@ func TestCronDaysOfWeek(t *testing.T) {
 
 	for i := 0; i < len(daysOfWeek); i++ {
 		cronDayOfWeek(t, daysOfWeek[i], expected[i])
-		cronDayOfWeek(t, strconv.Itoa(i), expected[i])
+		cronDayOfWeek(t, strconv.Itoa(i+1), expected[i])
 	}
 }
 
