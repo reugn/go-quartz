@@ -175,14 +175,16 @@ func (sched *StdScheduler) startExecutionLoop() {
 				return
 			}
 		} else {
-			tick := sched.calculateNextTick()
+			t := time.NewTimer(sched.calculateNextTick())
 			select {
-			case <-tick:
+			case <-t.C:
 				sched.executeAndReschedule()
 			case <-sched.interrupt:
+				t.Stop()
 				continue
 			case <-sched.exit:
 				log.Printf("Exit the execution loop.")
+				t.Stop()
 				return
 			}
 		}
@@ -196,7 +198,7 @@ func (sched *StdScheduler) queueLen() int {
 	return sched.Queue.Len()
 }
 
-func (sched *StdScheduler) calculateNextTick() <-chan time.Time {
+func (sched *StdScheduler) calculateNextTick() time.Duration {
 	sched.Lock()
 	var interval int64
 	if sched.Queue.Len() > 0 {
@@ -204,7 +206,7 @@ func (sched *StdScheduler) calculateNextTick() <-chan time.Time {
 	}
 	sched.Unlock()
 
-	return time.After(time.Duration(interval))
+	return time.Duration(interval)
 }
 
 func (sched *StdScheduler) executeAndReschedule() {

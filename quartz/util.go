@@ -34,7 +34,7 @@ func sliceAtoi(sa []string) ([]int, error) {
 	return si, nil
 }
 
-func fillRange(from int, to int) ([]int, error) {
+func fillRange(from, to int) ([]int, error) {
 	if to < from {
 		return nil, cronError("fillRange")
 	}
@@ -49,7 +49,7 @@ func fillRange(from int, to int) ([]int, error) {
 	return arr, nil
 }
 
-func fillStep(from int, step int, max int) ([]int, error) {
+func fillStep(from, step, max int) ([]int, error) {
 	if max < from {
 		return nil, cronError("fillStep")
 	}
@@ -73,7 +73,7 @@ func normalize(field string, tr []string) int {
 	return intVal(tr, field)
 }
 
-func inScope(i int, min int, max int) bool {
+func inScope(i, min, max int) bool {
 	if i >= min && i <= max {
 		return true
 	}
@@ -85,16 +85,16 @@ func cronError(cause string) error {
 	return fmt.Errorf("Invalid cron expression: %s", cause)
 }
 
-// Align single digit values (for the time.UnixDate format).
-func alignDigit(next int, prefix string) string {
+// Aligns single digit values.
+func alignDigit(next int) string {
 	if next < 10 {
-		return prefix + strconv.Itoa(next)
+		return "0" + strconv.Itoa(next)
 	}
 
 	return strconv.Itoa(next)
 }
 
-func step(prev int, next int, max int) int {
+func step(prev, next, max int) int {
 	diff := next - prev
 	if diff < 0 {
 		return diff + max
@@ -119,7 +119,7 @@ func atoi(str string) int {
 	return i
 }
 
-func maxDays(month int, year int) int {
+func maxDays(month, year int) int {
 	if month == 2 && isLeapYear(year) {
 		return 29
 	}

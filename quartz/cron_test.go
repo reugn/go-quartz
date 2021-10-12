@@ -81,7 +81,7 @@ func TestCronExpression6(t *testing.T) {
 func TestCronExpression7(t *testing.T) {
 	prev := int64(1555351200000000000)
 	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("* 5-9 14/2 * * 0-2 *")
+	cronTrigger, err := quartz.NewCronTrigger("* 5-9 14/2 * * 1-3 *")
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -116,7 +116,7 @@ func TestCronDaysOfWeek(t *testing.T) {
 
 	for i := 0; i < len(daysOfWeek); i++ {
 		cronDayOfWeek(t, daysOfWeek[i], expected[i])
-		cronDayOfWeek(t, strconv.Itoa(i), expected[i])
+		cronDayOfWeek(t, strconv.Itoa(i+1), expected[i])
 	}
 }
 
@@ -194,7 +194,7 @@ func TestCronHourly(t *testing.T) {
 	} else {
 		result, _ = iterate(prev, cronTrigger, 1000)
 	}
-	assertEqual(t, result, "Wed May 29 06:00:00 2019")
+	assertEqual(t, result, "Mon May 27 10:00:00 2019")
 }
 
 var readDateLayout = "Mon Jan 2 15:04:05 2006"
@@ -205,6 +205,7 @@ func iterate(prev int64, cronTrigger *quartz.CronTrigger, iterations int) (strin
 		prev, err = cronTrigger.NextFireTime(prev)
 		// fmt.Println(time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout))
 		if err != nil {
+			fmt.Println(err)
 			return "", err
 		}
 	}
