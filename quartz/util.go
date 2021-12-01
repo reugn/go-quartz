@@ -12,7 +12,7 @@ func indexes(search []string, target []string) ([]int, error) {
 	for _, a := range search {
 		index := intVal(target, a)
 		if index == -1 {
-			return nil, fmt.Errorf("Invalid cron field: %s", a)
+			return nil, fmt.Errorf("invalid cron field: %s", a)
 		}
 		searchIndexes = append(searchIndexes, index)
 	}
@@ -82,10 +82,10 @@ func inScope(i, min, max int) bool {
 }
 
 func cronError(cause string) error {
-	return fmt.Errorf("Invalid cron expression: %s", cause)
+	return fmt.Errorf("invalid cron expression: %s", cause)
 }
 
-// Aligns single digit values.
+// alignDigit justifies single digit values.
 func alignDigit(next int) string {
 	if next < 10 {
 		return "0" + strconv.Itoa(next)
@@ -113,7 +113,7 @@ func intVal(target []string, search string) int {
 	return -1 // TODO: return error
 }
 
-// Unsafe strconv.Atoi
+// atoi implements an unsafe strconv.Atoi.
 func atoi(str string) int {
 	i, _ := strconv.Atoi(str)
 	return i
@@ -127,6 +127,8 @@ func maxDays(month, year int) int {
 	return daysInMonth[month]
 }
 
+// isLeapYear determines if the given year is a leap year.
+// nolint:gocritic
 func isLeapYear(year int) bool {
 	if year%4 != 0 {
 		return false
@@ -147,7 +149,7 @@ func isOutdated(_time int64) bool {
 	return _time < NowNano()-(time.Second*30).Nanoseconds()
 }
 
-// HashCode calculates and returns a string parameter hash code.
+// HashCode calculates and returns a hash code for the given string.
 func HashCode(s string) int {
 	h := fnv.New32a()
 	h.Write([]byte(s))
