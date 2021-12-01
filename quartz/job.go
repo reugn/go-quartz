@@ -8,33 +8,35 @@ import (
 	"os/exec"
 )
 
-// Job is the interface to be implemented by structs which represent a 'job'
+// Job represents an interface to be implemented by structs which represent a 'job'
 // to be performed.
 type Job interface {
-	// Execute Called by the Scheduler when a Trigger fires that is associated with the Job.
+	// Execute is called by a Scheduler when the Trigger associated with this job fires.
 	Execute()
 
-	// Description returns a Job description.
+	// Description returns the Job description.
 	Description() string
 
-	// Key returns a Job unique key.
+	// Key returns the Job unique key.
 	Key() int
 }
 
-// JobStatus represents a job status.
+// JobStatus represents a Job status.
 type JobStatus int8
 
 const (
 	// NA is the initial JobStatus.
 	NA JobStatus = iota
+
 	// OK represents a successful JobStatus.
 	OK
+
 	// FAILURE represents a failed JobStatus.
 	FAILURE
 )
 
-// ShellJob is the shell command Job, implements the quartz.Job interface.
-// Consider the runtime.GOOS when sending the shell command to execute.
+// ShellJob represents a shell command Job, implements the quartz.Job interface.
+// Be aware of runtime.GOOS when sending shell commands for execution.
 type ShellJob struct {
 	Cmd       string
 	Result    string
@@ -43,20 +45,24 @@ type ShellJob struct {
 
 // NewShellJob returns a new ShellJob.
 func NewShellJob(cmd string) *ShellJob {
-	return &ShellJob{cmd, "", NA}
+	return &ShellJob{
+		Cmd:       cmd,
+		Result:    "",
+		JobStatus: NA,
+	}
 }
 
-// Description returns a ShellJob description.
+// Description returns the description of the ShellJob.
 func (sh *ShellJob) Description() string {
 	return fmt.Sprintf("ShellJob: %s.", sh.Cmd)
 }
 
-// Key returns a ShellJob unique key.
+// Key returns the unique ShellJob key.
 func (sh *ShellJob) Key() int {
 	return HashCode(sh.Description())
 }
 
-// Execute Called by the Scheduler when a Trigger fires that is associated with the Job.
+// Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (sh *ShellJob) Execute() {
 	out, err := exec.Command("sh", "-c", sh.Cmd).Output()
 	if err != nil {
@@ -66,10 +72,11 @@ func (sh *ShellJob) Execute() {
 	}
 
 	sh.JobStatus = OK
-	sh.Result = string(out[:])
+	sh.Result = string(out)
 }
 
-// CurlJob is the curl command Job, implements the quartz.Job interface.
+// CurlJob represents a cURL command Job, implements the quartz.Job interface.
+// cURL is a command-line tool for getting or sending data including files using URL syntax.
 type CurlJob struct {
 	RequestMethod string
 	URL           string
@@ -94,10 +101,8 @@ func NewCurlJob(
 		return nil, err
 	}
 
-	if headers != nil {
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 
 	return &CurlJob{
@@ -112,17 +117,17 @@ func NewCurlJob(
 	}, nil
 }
 
-// Description returns a CurlJob description.
+// Description returns the description of the CurlJob.
 func (cu *CurlJob) Description() string {
 	return fmt.Sprintf("CurlJob: %s %s %s", cu.RequestMethod, cu.URL, cu.Body)
 }
 
-// Key returns a CurlJob unique key.
+// Key returns the unique CurlJob key.
 func (cu *CurlJob) Key() int {
 	return HashCode(cu.Description())
 }
 
-// Execute Called by the Scheduler when a Trigger fires that is associated with the Job.
+// Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (cu *CurlJob) Execute() {
 	client := &http.Client{}
 	resp, err := client.Do(cu.request)
@@ -142,5 +147,5 @@ func (cu *CurlJob) Execute() {
 	}
 
 	cu.StatusCode = resp.StatusCode
-	cu.Response = string(body[:])
+	cu.Response = string(body)
 }
