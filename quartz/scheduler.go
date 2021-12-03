@@ -8,31 +8,39 @@ import (
 	"time"
 )
 
-// ScheduledJob wraps the scheduled job with the metadata.
+// ScheduledJob wraps a scheduled Job with its metadata.
 type ScheduledJob struct {
 	Job                Job
 	TriggerDescription string
 	NextRunTime        int64
 }
 
-// A Scheduler is the Jobs orchestrator.
-// Schedulers responsible for executing Jobs when their associated Triggers fire (when their scheduled time arrives).
+// Scheduler represents a Job orchestrator.
+// Schedulers are responsible for executing Jobs when their associated
+// Triggers fire (when their scheduled time arrives).
 type Scheduler interface {
-	// start the scheduler
+	// Start starts the scheduler.
 	Start()
-	// whether the scheduler has been started
+
+	// IsStarted determines whether the scheduler has been started.
 	IsStarted() bool
-	// schedule the job with the specified trigger
+
+	// ScheduleJob schedules a job using a specified trigger.
 	ScheduleJob(job Job, trigger Trigger) error
-	// get keys of all of the scheduled jobs
+
+	// GetJobKeys returns the keys of all of the scheduled jobs.
 	GetJobKeys() []int
-	// get the scheduled job metadata
+
+	// GetScheduledJob returns the scheduled job with the specified key.
 	GetScheduledJob(key int) (*ScheduledJob, error)
-	// remove the job from the execution queue
+
+	// DeleteJob removes the job with the specified key from the Scheduler's execution queue.
 	DeleteJob(key int) error
-	// clear all the scheduled jobs
+
+	// Clear removes all of the scheduled jobs.
 	Clear()
-	// shutdown the scheduler
+
+	// Stop shutdowns the scheduler.
 	Stop()
 }
 
@@ -52,23 +60,25 @@ func NewStdScheduler() *StdScheduler {
 		Queue:     &PriorityQueue{},
 		interrupt: make(chan struct{}, 1),
 		exit:      nil,
-		feeder:    make(chan *Item)}
+		feeder:    make(chan *Item),
+	}
 }
 
-// ScheduleJob uses the specified Trigger to schedule the Job.
+// ScheduleJob schedules a Job using a specified Trigger.
 func (sched *StdScheduler) ScheduleJob(job Job, trigger Trigger) error {
 	nextRunTime, err := trigger.NextFireTime(NowNano())
-
-	if err == nil {
-		sched.feeder <- &Item{
-			job,
-			trigger,
-			nextRunTime,
-			0}
-		return nil
+	if err != nil {
+		return err
 	}
 
-	return err
+	sched.feeder <- &Item{
+		Job:      job,
+		Trigger:  trigger,
+		priority: nextRunTime,
+		index:    0,
+	}
+
+	return nil
 }
 
 // Start starts the StdScheduler execution loop.
@@ -82,15 +92,17 @@ func (sched *StdScheduler) Start() {
 
 	// reset the exit channel
 	sched.exit = make(chan struct{})
+
 	// start the feed reader
 	go sched.startFeedReader()
+
 	// start scheduler execution loop
 	go sched.startExecutionLoop()
 
 	sched.started = true
 }
 
-// IsStarted states whether the scheduler has been started.
+// IsStarted determines whether the scheduler has been started.
 func (sched *StdScheduler) IsStarted() bool {
 	return sched.started
 }
@@ -108,7 +120,7 @@ func (sched *StdScheduler) GetJobKeys() []int {
 	return keys
 }
 
-// GetScheduledJob returns the ScheduledJob by the unique key.
+// GetScheduledJob returns the ScheduledJob with the specified key.
 func (sched *StdScheduler) GetScheduledJob(key int) (*ScheduledJob, error) {
 	sched.Lock()
 	defer sched.Unlock()
@@ -116,17 +128,17 @@ func (sched *StdScheduler) GetScheduledJob(key int) (*ScheduledJob, error) {
 	for _, item := range *sched.Queue {
 		if item.Job.Key() == key {
 			return &ScheduledJob{
-				item.Job,
-				item.Trigger.Description(),
-				item.priority,
+				Job:                item.Job,
+				TriggerDescription: item.Trigger.Description(),
+				NextRunTime:        item.priority,
 			}, nil
 		}
 	}
 
-	return nil, errors.New("No Job with the given Key found")
+	return nil, errors.New("no Job with the given Key found")
 }
 
-// DeleteJob removes the job for the specified key from the StdScheduler if present.
+// DeleteJob removes the Job with the specified key if present.
 func (sched *StdScheduler) DeleteJob(key int) error {
 	sched.Lock()
 	defer sched.Unlock()
@@ -138,7 +150,7 @@ func (sched *StdScheduler) DeleteJob(key int) error {
 		}
 	}
 
-	return errors.New("No Job with the given Key found")
+	return errors.New("no Job with the given Key found")
 }
 
 // Clear removes all of the scheduled jobs.
@@ -146,7 +158,7 @@ func (sched *StdScheduler) Clear() {
 	sched.Lock()
 	defer sched.Unlock()
 
-	// reset the jobs queue
+	// reset the job queue
 	sched.Queue = &PriorityQueue{}
 }
 
@@ -179,9 +191,10 @@ func (sched *StdScheduler) startExecutionLoop() {
 			select {
 			case <-t.C:
 				sched.executeAndReschedule()
+
 			case <-sched.interrupt:
 				t.Stop()
-				continue
+
 			case <-sched.exit:
 				log.Printf("Exit the execution loop.")
 				t.Stop()
@@ -244,6 +257,7 @@ func (sched *StdScheduler) startFeedReader() {
 			heap.Push(sched.Queue, item)
 			sched.reset()
 			sched.Unlock()
+
 		case <-sched.exit:
 			log.Printf("Exit the feed reader.")
 			return

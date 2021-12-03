@@ -1,5 +1,5 @@
 # go-quartz
-[![Build Status](https://travis-ci.org/reugn/go-quartz.svg?branch=master)](https://travis-ci.org/reugn/go-quartz)
+[![Build](https://github.com/reugn/go-quartz/actions/workflows/build.yml/badge.svg)](https://github.com/reugn/go-quartz/actions/workflows/build.yml)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/reugn/go-quartz)](https://pkg.go.dev/github.com/reugn/go-quartz)
 [![Go Report Card](https://goreportcard.com/badge/github.com/reugn/go-quartz)](https://goreportcard.com/report/github.com/reugn/go-quartz)
 [![codecov](https://codecov.io/gh/reugn/go-quartz/branch/master/graph/badge.svg)](https://codecov.io/gh/reugn/go-quartz)
@@ -25,21 +25,21 @@ Implemented Jobs
 Scheduler interface
 ```go
 type Scheduler interface {
-	// start the scheduler
+	// Start starts the scheduler.
 	Start()
-	// whether the scheduler has been started
+	// IsStarted determines whether the scheduler has been started.
 	IsStarted() bool
-	// schedule the job with the specified trigger
+	// ScheduleJob schedules a job using a specified trigger.
 	ScheduleJob(job Job, trigger Trigger) error
-	// get all scheduled jobs keys
+	// GetJobKeys returns the keys of all of the scheduled jobs.
 	GetJobKeys() []int
-	// get the scheduled job metadata
+	// GetScheduledJob returns the scheduled job with the specified key.
 	GetScheduledJob(key int) (*ScheduledJob, error)
-	// remove the job from the execution queue
+	// DeleteJob removes the job with the specified key from the Scheduler's execution queue.
 	DeleteJob(key int) error
-	// clear all scheduled jobs
+	// Clear removes all of the scheduled jobs.
 	Clear()
-	// shutdown the scheduler
+	// Stop shutdowns the scheduler.
 	Stop()
 }
 ```

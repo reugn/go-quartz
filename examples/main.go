@@ -9,20 +9,24 @@ import (
 	"github.com/reugn/go-quartz/quartz"
 )
 
-//demo main
 func main() {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
-	go demoJobs(wg)
-	go demoScheduler(wg)
+	go sampleJobs(wg)
+	go sampleScheduler(wg)
 
 	wg.Wait()
 }
 
-func demoScheduler(wg *sync.WaitGroup) {
+func sampleScheduler(wg *sync.WaitGroup) {
 	sched := quartz.NewStdScheduler()
-	cronTrigger, _ := quartz.NewCronTrigger("1/3 * * * * *")
+	cronTrigger, err := quartz.NewCronTrigger("1/3 * * * * *")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	cronJob := PrintJob{"Cron job"}
 	sched.Start()
 	sched.ScheduleJob(&PrintJob{"Ad hoc Job"}, quartz.NewRunOnceTrigger(time.Second*5))
@@ -33,8 +37,13 @@ func demoScheduler(wg *sync.WaitGroup) {
 
 	time.Sleep(time.Second * 10)
 
-	j, _ := sched.GetScheduledJob(cronJob.Key())
-	fmt.Println(j.TriggerDescription)
+	scheduledJob, err := sched.GetScheduledJob(cronJob.Key())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(scheduledJob.TriggerDescription)
 	fmt.Println("Before delete: ", sched.GetJobKeys())
 	sched.DeleteJob(cronJob.Key())
 	fmt.Println("After delete: ", sched.GetJobKeys())
@@ -44,16 +53,23 @@ func demoScheduler(wg *sync.WaitGroup) {
 	wg.Done()
 }
 
-func demoJobs(wg *sync.WaitGroup) {
+func sampleJobs(wg *sync.WaitGroup) {
 	sched := quartz.NewStdScheduler()
 	sched.Start()
-	cronTrigger, _ := quartz.NewCronTrigger("1/5 * * * * *")
+
+	cronTrigger, err := quartz.NewCronTrigger("1/5 * * * * *")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	shellJob := quartz.NewShellJob("ls -la")
 	curlJob, err := quartz.NewCurlJob(http.MethodGet, "http://worldclockapi.com/api/json/est/now", "", nil)
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
 		return
 	}
+
 	sched.ScheduleJob(shellJob, cronTrigger)
 	sched.ScheduleJob(curlJob, quartz.NewSimpleTrigger(time.Second*7))
 

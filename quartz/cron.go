@@ -61,7 +61,7 @@ func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 	return parser.nextTime(prev, ct.fields)
 }
 
-// Description returns a CronTrigger description.
+// Description returns the CronTrigger description.
 func (ct *CronTrigger) Description() string {
 	return fmt.Sprintf("CronTrigger %s", ct.expression)
 }
@@ -150,7 +150,7 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 			case error:
 				err = x
 			default:
-				err = errors.New("Unknown cron expression error")
+				err = errors.New("unknown cron expression error")
 			}
 		}
 	}()
@@ -358,10 +358,7 @@ func (parser *CronExpressionParser) setDone(index int) {
 }
 
 func (parser *CronExpressionParser) lastSet(index int) bool {
-	if parser.lastDefined <= index {
-		return true
-	}
-	return false
+	return parser.lastDefined <= index
 }
 
 func (parser *CronExpressionParser) nextSeconds(prev int, field *CronField) string {
@@ -482,18 +479,18 @@ func bumpLiteral(iprev int, max int, step int) (int, bool) {
 
 // returns bumped value, bump next
 func bumpValue(prev interface{}, max, step int, zero bool) (int, bool) {
-	var iprev, bumped int
+	var iprev int
 
-	switch prev.(type) {
+	switch prevValue := prev.(type) {
 	case string:
-		iprev, _ = strconv.Atoi(prev.(string))
+		iprev = atoi(prevValue)
 	case int:
-		iprev = prev.(int)
+		iprev = prevValue
 	default:
 		panic("Unknown type at bumpValue")
 	}
 
-	bumped = iprev + step
+	bumped := iprev + step
 	if bumped > max {
 		if zero {
 			return 0, true
@@ -508,11 +505,11 @@ func bumpValue(prev interface{}, max, step int, zero bool) (int, bool) {
 func (parser *CronExpressionParser) findNextValue(prev interface{}, values []int) (int, bool) {
 	var iprev int
 
-	switch prev.(type) {
+	switch prevValue := prev.(type) {
 	case string:
-		iprev, _ = strconv.Atoi(prev.(string))
+		iprev = atoi(prevValue)
 	case int:
-		iprev = prev.(int)
+		iprev = prevValue
 	default:
 		panic("Unknown type at findNextValue")
 	}
