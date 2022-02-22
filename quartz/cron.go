@@ -112,8 +112,8 @@ func (cf *CronField) String() string {
 }
 
 var (
-	months      = []string{"0", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}
-	days        = []string{"0", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
+	months      = []string{"0", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
+	days        = []string{"0", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"}
 	daysInMonth = []int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 
 	// the pre-defined cron expressions

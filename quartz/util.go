@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -64,13 +65,13 @@ func fillStep(from, step, max int) ([]int, error) {
 	return arr, nil
 }
 
-func normalize(field string, tr []string) int {
+func normalize(field string, dict []string) int {
 	i, err := strconv.Atoi(field)
 	if err == nil {
 		return i
 	}
 
-	return intVal(tr, field)
+	return intVal(dict, field)
 }
 
 func inScope(i, min, max int) bool {
@@ -104,8 +105,9 @@ func step(prev, next, max int) int {
 }
 
 func intVal(target []string, search string) int {
+	uSearch := strings.ToUpper(search)
 	for i, v := range target {
-		if v == search {
+		if v == uSearch {
 			return i
 		}
 	}

@@ -37,7 +37,7 @@ func TestCronExpression2(t *testing.T) {
 func TestCronExpression3(t *testing.T) {
 	prev := int64(1555351200000000000)
 	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("* 5,7,9 14/2 * * Wed,Sat *")
+	cronTrigger, err := quartz.NewCronTrigger("* 5,7,9 14/2 * * WED,Sat *")
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -69,7 +69,7 @@ func TestCronExpression5(t *testing.T) {
 func TestCronExpression6(t *testing.T) {
 	prev := int64(1555351200000000000)
 	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("* * 14/2 * * Mon/3 *")
+	cronTrigger, err := quartz.NewCronTrigger("* * 14/2 * * mon/3 *")
 	if err != nil {
 		t.Fatal(err)
 	} else {
