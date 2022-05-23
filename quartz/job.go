@@ -14,10 +14,10 @@ type Job interface {
 	// Execute is called by a Scheduler when the Trigger associated with this job fires.
 	Execute()
 
-	// Description returns the Job description.
+	// Description returns the description of the Job.
 	Description() string
 
-	// Key returns the Job unique key.
+	// Key returns the unique key for the Job.
 	Key() int
 }
 
@@ -25,13 +25,13 @@ type Job interface {
 type JobStatus int8
 
 const (
-	// NA is the initial JobStatus.
+	// NA is the initial Job status.
 	NA JobStatus = iota
 
-	// OK represents a successful JobStatus.
+	// OK indicates the Job was completed successfully.
 	OK
 
-	// FAILURE represents a failed JobStatus.
+	// FAILURE indicates the Job failed.
 	FAILURE
 )
 
