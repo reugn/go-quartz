@@ -102,6 +102,22 @@ func TestCronExpression8(t *testing.T) {
 	assertEqual(t, result, "Sat Sep 7 12:00:00 2019")
 }
 
+func TestCronExpressionWithLoc(t *testing.T) {
+	prev := int64(1555351200000000000)
+	result := ""
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cronTrigger, err := quartz.NewCronTriggerWithLoc("* 5 22-23 * * Sun *", loc)
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 100)
+	}
+	assertEqual(t, result, "Mon Mar 30 03:05:00 2020")
+}
+
 func TestCronDaysOfWeek(t *testing.T) {
 	daysOfWeek := []string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 	expected := []string{
