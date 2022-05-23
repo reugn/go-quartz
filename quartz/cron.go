@@ -31,10 +31,19 @@ type CronTrigger struct {
 	expression  string
 	fields      []*CronField
 	lastDefined int
+	location    *time.Location
 }
 
-// NewCronTrigger returns a new CronTrigger.
+// Verify CronTrigger satisfies the Trigger interface.
+var _ Trigger = (*CronTrigger)(nil)
+
+// NewCronTrigger returns a new CronTrigger using the UTC location.
 func NewCronTrigger(expr string) (*CronTrigger, error) {
+	return NewCronTriggerWithLoc(expr, time.UTC)
+}
+
+// NewCronTriggerWithLoc returns a new CronTrigger with the given time.Location.
+func NewCronTriggerWithLoc(expr string, location *time.Location) (*CronTrigger, error) {
 	fields, err := validateCronExpression(expr)
 	if err != nil {
 		return nil, err
@@ -52,16 +61,22 @@ func NewCronTrigger(expr string) (*CronTrigger, error) {
 		fields[0].values, _ = fillRange(0, 59)
 	}
 
-	return &CronTrigger{expr, fields, lastDefined}, nil
+	return &CronTrigger{
+		expression:  expr,
+		fields:      fields,
+		lastDefined: lastDefined,
+		location:    location,
+	}, nil
 }
 
 // NextFireTime returns the next time at which the CronTrigger is scheduled to fire.
 func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 	parser := NewCronExpressionParser(ct.lastDefined)
-	return parser.nextTime(prev, ct.fields)
+	prevTime := time.Unix(prev/int64(time.Second), 0).In(ct.location)
+	return parser.nextTime(prevTime, ct.fields)
 }
 
-// Description returns the CronTrigger description.
+// Description returns the description of the trigger.
 func (ct *CronTrigger) Description() string {
 	return fmt.Sprintf("CronTrigger %s", ct.expression)
 }
@@ -141,7 +156,7 @@ const (
 	yearIndex
 )
 
-func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (nextTime int64, err error) {
+func (parser *CronExpressionParser) nextTime(prev time.Time, fields []*CronField) (nextTime int64, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch x := r.(type) {
@@ -155,7 +170,7 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 		}
 	}()
 
-	tfmt := time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout)
+	tfmt := prev.Format(readDateLayout)
 	ttok := strings.Split(strings.Replace(tfmt, "  ", " ", 1), " ")
 	hms := strings.Split(ttok[3], ":")
 	parser.maxDays = maxDays(intVal(months, ttok[1]), atoi(ttok[4]))
@@ -169,7 +184,7 @@ func (parser *CronExpressionParser) nextTime(prev int64, fields []*CronField) (n
 
 	nstr := fmt.Sprintf("%s %s %s:%s:%s %s", month, strconv.Itoa(dayOfMonth),
 		hour, minute, second, year)
-	ntime, err := time.Parse(writeDateLayout, nstr)
+	ntime, err := time.ParseInLocation(writeDateLayout, nstr, prev.Location())
 	nextTime = ntime.UnixNano()
 	return
 }
