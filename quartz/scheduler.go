@@ -54,6 +54,9 @@ type StdScheduler struct {
 	started   bool
 }
 
+// Verify StdScheduler satisfies the Scheduler interface.
+var _ Scheduler = (*StdScheduler)(nil)
+
 // NewStdScheduler returns a new StdScheduler.
 func NewStdScheduler() *StdScheduler {
 	return &StdScheduler{

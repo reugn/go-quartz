@@ -10,18 +10,6 @@ A minimalistic and zero-dependency scheduling library for Go.
 Inspired by the [Quartz](https://github.com/quartz-scheduler/quartz) Java scheduler.
 
 ### Library building blocks
-Job interface. Any type that implements it can be scheduled.
-```go
-type Job interface {
-	Execute()
-	Description() string
-	Key() int
-}
-```
-Implemented Jobs
-- ShellJob
-- CurlJob
-
 Scheduler interface
 ```go
 type Scheduler interface {
@@ -49,7 +37,9 @@ Implemented Schedulers
 Trigger interface
 ```go
 type Trigger interface {
+	// NextFireTime returns the next time at which the Trigger is scheduled to fire.
 	NextFireTime(prev int64) (int64, error)
+	// Description returns the description of the Trigger.
 	Description() string
 }
 ```
@@ -57,6 +47,21 @@ Implemented Triggers
 - CronTrigger
 - SimpleTrigger
 - RunOnceTrigger
+
+Job interface. Any type that implements it can be scheduled.
+```go
+type Job interface {
+	// Execute is called by a Scheduler when the Trigger associated with this job fires.
+	Execute()
+	// Description returns the description of the Job.
+	Description() string
+	// Key returns the unique key for the Job.
+	Key() int
+}
+```
+Implemented Jobs
+- ShellJob
+- CurlJob
 
 ## Cron expression format
 | Field Name   | Mandatory | Allowed Values  | Allowed Special Characters |
