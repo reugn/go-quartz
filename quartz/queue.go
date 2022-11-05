@@ -2,27 +2,27 @@ package quartz
 
 import "container/heap"
 
-// Item is the PriorityQueue item.
-type Item struct {
+// item is the priorityQueue item.
+type item struct {
 	Job      Job
 	Trigger  Trigger
 	priority int64 // item priority, backed by the next run time.
 	index    int   // maintained by the heap.Interface methods.
 }
 
-// PriorityQueue implements the heap.Interface.
-type PriorityQueue []*Item
+// priorityQueue implements the heap.Interface.
+type priorityQueue []*item
 
-// Len returns the PriorityQueue length.
-func (pq PriorityQueue) Len() int { return len(pq) }
+// Len returns the priorityQueue length.
+func (pq priorityQueue) Len() int { return len(pq) }
 
 // Less is the items less comparator.
-func (pq PriorityQueue) Less(i, j int) bool {
+func (pq priorityQueue) Less(i, j int) bool {
 	return pq[i].priority < pq[j].priority
 }
 
 // Swap exchanges the indexes of the items.
-func (pq PriorityQueue) Swap(i, j int) {
+func (pq priorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 	pq[i].index = i
 	pq[j].index = j
@@ -30,16 +30,16 @@ func (pq PriorityQueue) Swap(i, j int) {
 
 // Push implements the heap.Interface.Push.
 // Adds x as element Len().
-func (pq *PriorityQueue) Push(x interface{}) {
+func (pq *priorityQueue) Push(x interface{}) {
 	n := len(*pq)
-	item := x.(*Item)
+	item := x.(*item)
 	item.index = n
 	*pq = append(*pq, item)
 }
 
 // Pop implements the heap.Interface.Pop.
 // Removes and returns element Len() - 1.
-func (pq *PriorityQueue) Pop() interface{} {
+func (pq *priorityQueue) Pop() interface{} {
 	old := *pq
 	n := len(old)
 	item := old[n-1]
@@ -48,12 +48,12 @@ func (pq *PriorityQueue) Pop() interface{} {
 	return item
 }
 
-// Head returns the first item of a PriorityQueue without removing it.
-func (pq *PriorityQueue) Head() *Item {
+// Head returns the first item of the priorityQueue without removing it.
+func (pq *priorityQueue) Head() *item {
 	return (*pq)[0]
 }
 
-// Remove removes and returns the element at index i from the PriorityQueue.
-func (pq *PriorityQueue) Remove(i int) interface{} {
+// Remove removes and returns the element at index i from the priorityQueue.
+func (pq *priorityQueue) Remove(i int) interface{} {
 	return heap.Remove(pq, i)
 }

@@ -22,14 +22,14 @@ import (
 // "0 * 14 * * ?"           Fire every minute starting at 2pm and ending at 2:59pm, every day
 // "0 0/5 14 * * ?"         Fire every 5 minutes starting at 2pm and ending at 2:55pm, every day
 // "0 0/5 14,18 * * ?"      Fire every 5 minutes starting at 2pm and ending at 2:55pm,
-//                          AND fire every 5 minutes starting at 6pm and ending at 6:55pm, every day
+// AND fire every 5 minutes starting at 6pm and ending at 6:55pm, every day
 // "0 0-5 14 * * ?"         Fire every minute starting at 2pm and ending at 2:05pm, every day
 // "0 10,44 14 ? 3 WED"     Fire at 2:10pm and at 2:44pm every Wednesday in the month of March.
 // "0 15 10 ? * MON-FRI"    Fire at 10:15am every Monday, Tuesday, Wednesday, Thursday and Friday
 // "0 15 10 15 * ?"         Fire at 10:15am on the 15th day of every month
 type CronTrigger struct {
 	expression  string
-	fields      []*CronField
+	fields      []*cronField
 	lastDefined int
 	location    *time.Location
 }
@@ -71,7 +71,7 @@ func NewCronTriggerWithLoc(expr string, location *time.Location) (*CronTrigger, 
 
 // NextFireTime returns the next time at which the CronTrigger is scheduled to fire.
 func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
-	parser := NewCronExpressionParser(ct.lastDefined)
+	parser := newCronExpressionParser(ct.lastDefined)
 	prevTime := time.Unix(prev/int64(time.Second), 0).In(ct.location)
 	return parser.nextTime(prevTime, ct.fields)
 }
@@ -81,8 +81,8 @@ func (ct *CronTrigger) Description() string {
 	return fmt.Sprintf("CronTrigger %s", ct.expression)
 }
 
-// CronExpressionParser parses cron expressions.
-type CronExpressionParser struct {
+// cronExpressionParser parses cron expressions.
+type cronExpressionParser struct {
 	minuteBump bool
 	hourBump   bool
 	dayBump    bool
@@ -94,24 +94,24 @@ type CronExpressionParser struct {
 	maxDays     int
 }
 
-// NewCronExpressionParser returns a new CronExpressionParser.
-func NewCronExpressionParser(lastDefined int) *CronExpressionParser {
-	return &CronExpressionParser{false, false, false, false, false, false,
+// newCronExpressionParser returns a new cronExpressionParser.
+func newCronExpressionParser(lastDefined int) *cronExpressionParser {
+	return &cronExpressionParser{false, false, false, false, false, false,
 		lastDefined, 0}
 }
 
-// CronField represents a parsed cron expression as an array.
-type CronField struct {
+// cronField represents a parsed cron expression as an array.
+type cronField struct {
 	values []int
 }
 
-// isEmpty checks if the CronField values array is empty.
-func (cf *CronField) isEmpty() bool {
+// isEmpty checks if the cronField values array is empty.
+func (cf *cronField) isEmpty() bool {
 	return len(cf.values) == 0
 }
 
 // incr increments each element of the underlying array by the given value.
-func (cf *CronField) incr(a int) {
+func (cf *cronField) incr(a int) {
 	if !cf.isEmpty() {
 		mapped := make([]int, len(cf.values))
 		for i, v := range cf.values {
@@ -121,8 +121,8 @@ func (cf *CronField) incr(a int) {
 	}
 }
 
-// String is the CronField fmt.Stringer implementation.
-func (cf *CronField) String() string {
+// String is the cronField fmt.Stringer implementation.
+func (cf *cronField) String() string {
 	return strings.Trim(strings.Join(strings.Fields(fmt.Sprint(cf.values)), ","), "[]")
 }
 
@@ -156,7 +156,7 @@ const (
 	yearIndex
 )
 
-func (parser *CronExpressionParser) nextTime(prev time.Time, fields []*CronField) (nextTime int64, err error) {
+func (parser *cronExpressionParser) nextTime(prev time.Time, fields []*cronField) (nextTime int64, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch x := r.(type) {
@@ -190,7 +190,7 @@ func (parser *CronExpressionParser) nextTime(prev time.Time, fields []*CronField
 }
 
 // the ? wildcard is only used in the day of month and day of week fields
-func validateCronExpression(expression string) ([]*CronField, error) {
+func validateCronExpression(expression string) ([]*cronField, error) {
 	var tokens []string
 
 	if value, ok := special[expression]; ok {
@@ -215,9 +215,9 @@ func validateCronExpression(expression string) ([]*CronField, error) {
 	return buildCronField(tokens)
 }
 
-func buildCronField(tokens []string) ([]*CronField, error) {
+func buildCronField(tokens []string) ([]*cronField, error) {
 	var err error
-	fields := make([]*CronField, 7)
+	fields := make([]*cronField, 7)
 	fields[0], err = parseField(tokens[0], 0, 59)
 	if err != nil {
 		return nil, err
@@ -257,7 +257,7 @@ func buildCronField(tokens []string) ([]*CronField, error) {
 	return fields, nil
 }
 
-func parseField(field string, min int, max int, translate ...[]string) (*CronField, error) {
+func parseField(field string, min int, max int, translate ...[]string) (*cronField, error) {
 	var dict []string
 	if len(translate) > 0 {
 		dict = translate[0]
@@ -265,14 +265,14 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 
 	// any value
 	if field == "*" || field == "?" {
-		return &CronField{[]int{}}, nil
+		return &cronField{[]int{}}, nil
 	}
 
 	// single value
 	i, err := strconv.Atoi(field)
 	if err == nil {
 		if inScope(i, min, max) {
-			return &CronField{[]int{i}}, nil
+			return &cronField{[]int{i}}, nil
 		}
 		return nil, cronError("Single min/max validation error")
 	}
@@ -297,7 +297,7 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 		i := intVal(dict, field)
 		if i >= 0 {
 			if inScope(i, min, max) {
-				return &CronField{[]int{i}}, nil
+				return &cronField{[]int{i}}, nil
 			}
 			return nil, cronError("Cron literal min/max validation error")
 		}
@@ -306,7 +306,7 @@ func parseField(field string, min int, max int, translate ...[]string) (*CronFie
 	return nil, cronError("Cron parse error")
 }
 
-func parseListField(field string, translate []string) (*CronField, error) {
+func parseListField(field string, translate []string) (*cronField, error) {
 	t := strings.Split(field, ",")
 	si, err := sliceAtoi(t)
 	if err != nil {
@@ -317,10 +317,10 @@ func parseListField(field string, translate []string) (*CronField, error) {
 	}
 
 	sort.Ints(si)
-	return &CronField{si}, nil
+	return &cronField{si}, nil
 }
 
-func parseRangeField(field string, min int, max int, translate []string) (*CronField, error) {
+func parseRangeField(field string, min int, max int, translate []string) (*cronField, error) {
 	var _range []int
 	t := strings.Split(field, "-")
 	if len(t) != 2 {
@@ -338,10 +338,10 @@ func parseRangeField(field string, min int, max int, translate []string) (*CronF
 		return nil, err
 	}
 
-	return &CronField{_range}, nil
+	return &cronField{_range}, nil
 }
 
-func parseStepField(field string, min int, max int, translate []string) (*CronField, error) {
+func parseStepField(field string, min int, max int, translate []string) (*cronField, error) {
 	var _step []int
 	t := strings.Split(field, "/")
 	if len(t) != 2 {
@@ -363,27 +363,27 @@ func parseStepField(field string, min int, max int, translate []string) (*CronFi
 		return nil, err
 	}
 
-	return &CronField{_step}, nil
+	return &cronField{_step}, nil
 }
 
-func (parser *CronExpressionParser) setDone(index int) {
+func (parser *cronExpressionParser) setDone(index int) {
 	if parser.lastDefined == index {
 		parser.done = true
 	}
 }
 
-func (parser *CronExpressionParser) lastSet(index int) bool {
+func (parser *cronExpressionParser) lastSet(index int) bool {
 	return parser.lastDefined <= index
 }
 
-func (parser *CronExpressionParser) nextSeconds(prev int, field *CronField) string {
+func (parser *cronExpressionParser) nextSeconds(prev int, field *cronField) string {
 	var next int
 	next, parser.minuteBump = parser.findNextValue(prev, field.values)
 	parser.setDone(secondIndex)
 	return alignDigit(next)
 }
 
-func (parser *CronExpressionParser) nextMinutes(prev int, field *CronField) string {
+func (parser *cronExpressionParser) nextMinutes(prev int, field *cronField) string {
 	var next int
 	if field.isEmpty() && parser.lastSet(minuteIndex) {
 		if parser.minuteBump {
@@ -398,7 +398,7 @@ func (parser *CronExpressionParser) nextMinutes(prev int, field *CronField) stri
 	return alignDigit(next)
 }
 
-func (parser *CronExpressionParser) nextHours(prev int, field *CronField) string {
+func (parser *cronExpressionParser) nextHours(prev int, field *cronField) string {
 	var next int
 	if field.isEmpty() && parser.lastSet(hourIndex) {
 		if parser.hourBump {
@@ -413,8 +413,8 @@ func (parser *CronExpressionParser) nextHours(prev int, field *CronField) string
 	return alignDigit(next)
 }
 
-func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
-	prevMonth int, monthField *CronField) int {
+func (parser *cronExpressionParser) nextDay(prevWeek int, weekField *cronField,
+	prevMonth int, monthField *cronField) int {
 	var nextMonth int
 	if weekField.isEmpty() && monthField.isEmpty() && parser.lastSet(dayOfWeekIndex) {
 		if parser.dayBump {
@@ -447,7 +447,7 @@ func (parser *CronExpressionParser) nextDay(prevWeek int, weekField *CronField,
 	return prevMonth
 }
 
-func (parser *CronExpressionParser) nextMonth(prev string, field *CronField) string {
+func (parser *cronExpressionParser) nextMonth(prev string, field *cronField) string {
 	var next int
 	if field.isEmpty() && parser.lastSet(dayOfWeekIndex) {
 		if parser.monthBump {
@@ -462,7 +462,7 @@ func (parser *CronExpressionParser) nextMonth(prev string, field *CronField) str
 	return months[next]
 }
 
-func (parser *CronExpressionParser) nextYear(prev string, field *CronField) string {
+func (parser *cronExpressionParser) nextYear(prev string, field *cronField) string {
 	var next int
 	if field.isEmpty() && parser.lastSet(yearIndex) {
 		if parser.yearBump {
@@ -517,7 +517,7 @@ func bumpValue(prev interface{}, max, step int, zero bool) (int, bool) {
 }
 
 // returns next value, bump next
-func (parser *CronExpressionParser) findNextValue(prev interface{}, values []int) (int, bool) {
+func (parser *cronExpressionParser) findNextValue(prev interface{}, values []int) (int, bool) {
 	var iprev int
 
 	switch prevValue := prev.(type) {

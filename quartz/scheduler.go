@@ -47,10 +47,10 @@ type Scheduler interface {
 // StdScheduler implements the quartz.Scheduler interface.
 type StdScheduler struct {
 	sync.Mutex
-	Queue     *PriorityQueue
+	queue     *priorityQueue
 	interrupt chan struct{}
 	exit      chan struct{}
-	feeder    chan *Item
+	feeder    chan *item
 	started   bool
 }
 
@@ -60,10 +60,10 @@ var _ Scheduler = (*StdScheduler)(nil)
 // NewStdScheduler returns a new StdScheduler.
 func NewStdScheduler() *StdScheduler {
 	return &StdScheduler{
-		Queue:     &PriorityQueue{},
+		queue:     &priorityQueue{},
 		interrupt: make(chan struct{}, 1),
 		exit:      nil,
-		feeder:    make(chan *Item),
+		feeder:    make(chan *item),
 	}
 }
 
@@ -74,7 +74,7 @@ func (sched *StdScheduler) ScheduleJob(job Job, trigger Trigger) error {
 		return err
 	}
 
-	sched.feeder <- &Item{
+	sched.feeder <- &item{
 		Job:      job,
 		Trigger:  trigger,
 		priority: nextRunTime,
@@ -115,8 +115,8 @@ func (sched *StdScheduler) GetJobKeys() []int {
 	sched.Lock()
 	defer sched.Unlock()
 
-	keys := make([]int, 0, sched.Queue.Len())
-	for _, item := range *sched.Queue {
+	keys := make([]int, 0, sched.queue.Len())
+	for _, item := range *sched.queue {
 		keys = append(keys, item.Job.Key())
 	}
 
@@ -128,7 +128,7 @@ func (sched *StdScheduler) GetScheduledJob(key int) (*ScheduledJob, error) {
 	sched.Lock()
 	defer sched.Unlock()
 
-	for _, item := range *sched.Queue {
+	for _, item := range *sched.queue {
 		if item.Job.Key() == key {
 			return &ScheduledJob{
 				Job:                item.Job,
@@ -146,9 +146,9 @@ func (sched *StdScheduler) DeleteJob(key int) error {
 	sched.Lock()
 	defer sched.Unlock()
 
-	for i, item := range *sched.Queue {
+	for i, item := range *sched.queue {
 		if item.Job.Key() == key {
-			sched.Queue.Remove(i)
+			sched.queue.Remove(i)
 			return nil
 		}
 	}
@@ -162,7 +162,7 @@ func (sched *StdScheduler) Clear() {
 	defer sched.Unlock()
 
 	// reset the job queue
-	sched.Queue = &PriorityQueue{}
+	sched.queue = &priorityQueue{}
 }
 
 // Stop exits the StdScheduler execution loop.
@@ -211,14 +211,14 @@ func (sched *StdScheduler) queueLen() int {
 	sched.Lock()
 	defer sched.Unlock()
 
-	return sched.Queue.Len()
+	return sched.queue.Len()
 }
 
 func (sched *StdScheduler) calculateNextTick() time.Duration {
 	sched.Lock()
 	var interval int64
-	if sched.Queue.Len() > 0 {
-		interval = parkTime(sched.Queue.Head().priority)
+	if sched.queue.Len() > 0 {
+		interval = parkTime(sched.queue.Head().priority)
 	}
 	sched.Unlock()
 
@@ -233,7 +233,7 @@ func (sched *StdScheduler) executeAndReschedule() {
 
 	// fetch an item
 	sched.Lock()
-	item := heap.Pop(sched.Queue).(*Item)
+	item := heap.Pop(sched.queue).(*item)
 	sched.Unlock()
 
 	// execute the Job
@@ -257,7 +257,7 @@ func (sched *StdScheduler) startFeedReader() {
 		select {
 		case item := <-sched.feeder:
 			sched.Lock()
-			heap.Push(sched.Queue, item)
+			heap.Push(sched.queue, item)
 			sched.reset()
 			sched.Unlock()
 
