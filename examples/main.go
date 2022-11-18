@@ -69,15 +69,18 @@ func sampleJobs(wg *sync.WaitGroup) {
 		fmt.Println(err)
 		return
 	}
+	functionJob := quartz.NewFunctionJobWithDesc("42", func() (int, error) { return 42, nil })
 
 	sched.ScheduleJob(shellJob, cronTrigger)
 	sched.ScheduleJob(curlJob, quartz.NewSimpleTrigger(time.Second*7))
+	sched.ScheduleJob(functionJob, quartz.NewSimpleTrigger(time.Second*3))
 
 	time.Sleep(time.Second * 10)
 
 	fmt.Println(sched.GetJobKeys())
 	fmt.Println(shellJob.Result)
 	fmt.Println(curlJob.Response)
+	fmt.Println(functionJob.Result)
 
 	time.Sleep(time.Second * 2)
 	sched.Stop()
