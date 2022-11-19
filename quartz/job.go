@@ -3,7 +3,7 @@ package quartz
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os/exec"
 )
@@ -139,7 +139,7 @@ func (cu *CurlJob) Execute() {
 	}
 
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		cu.JobStatus = OK
 	} else {
