@@ -54,7 +54,7 @@ func NewShellJob(cmd string) *ShellJob {
 
 // Description returns the description of the ShellJob.
 func (sh *ShellJob) Description() string {
-	return fmt.Sprintf("ShellJob: %s.", sh.Cmd)
+	return fmt.Sprintf("ShellJob: %s", sh.Cmd)
 }
 
 // Key returns the unique ShellJob key.

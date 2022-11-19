@@ -16,7 +16,7 @@ type FunctionJob[R any] struct {
 	JobStatus JobStatus
 }
 
-// NewFunctionJob returns a new FunctionJob without an explicit description
+// NewFunctionJob returns a new FunctionJob without an explicit description.
 func NewFunctionJob[R any](function Function[R]) *FunctionJob[R] {
 	return &FunctionJob[R]{
 		function:  &function,
@@ -27,7 +27,7 @@ func NewFunctionJob[R any](function Function[R]) *FunctionJob[R] {
 	}
 }
 
-// NewFunctionJob returns a new FunctionJob with an explicit  description
+// NewFunctionJob returns a new FunctionJob with an explicit description.
 func NewFunctionJobWithDesc[R any](desc string, function Function[R]) *FunctionJob[R] {
 	return &FunctionJob[R]{
 		function:  &function,

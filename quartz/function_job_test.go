@@ -10,12 +10,12 @@ import (
 func TestFunctionJob(t *testing.T) {
 	var n = 2
 	funcJob1 := quartz.NewFunctionJob(func() (string, error) {
-		n = n + 2
+		n += 2
 		return "fired1", nil
 	})
 
 	funcJob2 := quartz.NewFunctionJob(func() (int, error) {
-		n = n + 2
+		n += 2
 		return 42, nil
 	})
 
