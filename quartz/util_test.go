@@ -7,19 +7,13 @@ import (
 	"github.com/reugn/go-quartz/quartz"
 )
 
-func assertEqual(t *testing.T, a interface{}, b interface{}) {
+func assertEqual[T any](t *testing.T, a T, b T) {
 	if !reflect.DeepEqual(a, b) {
 		t.Fatalf("%v != %v", a, b)
 	}
 }
 
-func assertEqualInt64(t *testing.T, a int64, b int64) {
-	if a != b {
-		t.Fatalf("%d != %d", a, b)
-	}
-}
-
-func assertNotEqual(t *testing.T, a interface{}, b interface{}) {
+func assertNotEqual[T any](t *testing.T, a T, b T) {
 	if reflect.DeepEqual(a, b) {
 		t.Fatalf("%v == %v", a, b)
 	}

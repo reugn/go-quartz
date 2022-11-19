@@ -14,15 +14,15 @@ func TestSimpleTrigger(t *testing.T) {
 	trigger.Description()
 
 	next, err := trigger.NextFireTime(fromEpoch)
-	assertEqualInt64(t, next, 1577836805000000000)
+	assertEqual(t, next, 1577836805000000000)
 	assertEqual(t, err, nil)
 
 	next, err = trigger.NextFireTime(next)
-	assertEqualInt64(t, next, 1577836810000000000)
+	assertEqual(t, next, 1577836810000000000)
 	assertEqual(t, err, nil)
 
 	next, err = trigger.NextFireTime(next)
-	assertEqualInt64(t, next, 1577836815000000000)
+	assertEqual(t, next, 1577836815000000000)
 	assertEqual(t, err, nil)
 }
 
@@ -31,10 +31,10 @@ func TestRunOnceTrigger(t *testing.T) {
 	trigger.Description()
 
 	next, err := trigger.NextFireTime(fromEpoch)
-	assertEqualInt64(t, next, 1577836805000000000)
+	assertEqual(t, next, 1577836805000000000)
 	assertEqual(t, err, nil)
 
 	next, err = trigger.NextFireTime(next)
-	assertEqualInt64(t, next, 0)
+	assertEqual(t, next, 0)
 	assertNotEqual(t, err, nil)
 }

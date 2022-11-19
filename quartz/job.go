@@ -3,7 +3,7 @@ package quartz
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os/exec"
 )
@@ -54,7 +54,7 @@ func NewShellJob(cmd string) *ShellJob {
 
 // Description returns the description of the ShellJob.
 func (sh *ShellJob) Description() string {
-	return fmt.Sprintf("ShellJob: %s.", sh.Cmd)
+	return fmt.Sprintf("ShellJob: %s", sh.Cmd)
 }
 
 // Key returns the unique ShellJob key.
@@ -139,7 +139,7 @@ func (cu *CurlJob) Execute() {
 	}
 
 	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		cu.JobStatus = OK
 	} else {

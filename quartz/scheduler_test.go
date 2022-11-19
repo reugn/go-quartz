@@ -36,7 +36,7 @@ func TestScheduler(t *testing.T) {
 
 	time.Sleep(time.Second)
 	scheduledJobKeys := sched.GetJobKeys()
-	assertEqual(t, scheduledJobKeys, []int{3059422767, 328790344})
+	assertEqual(t, scheduledJobKeys, []int{3668896347, 328790344})
 
 	_, err = sched.GetScheduledJob(jobKeys[0])
 	if err != nil {
