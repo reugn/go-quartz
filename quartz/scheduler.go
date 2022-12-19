@@ -52,6 +52,11 @@ type StdScheduler struct {
 	exit      chan struct{}
 	feeder    chan *item
 	started   bool
+	opts      StdSchedulerOptions
+}
+
+type StdSchedulerOptions struct {
+	BlockingExecution bool
 }
 
 // Verify StdScheduler satisfies the Scheduler interface.
@@ -59,11 +64,16 @@ var _ Scheduler = (*StdScheduler)(nil)
 
 // NewStdScheduler returns a new StdScheduler.
 func NewStdScheduler() *StdScheduler {
+	return NewStdSchedulerWithOptions(StdSchedulerOptions{})
+}
+
+func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
 	return &StdScheduler{
 		queue:     &priorityQueue{},
 		interrupt: make(chan struct{}, 1),
 		exit:      nil,
 		feeder:    make(chan *item),
+		opts:      opts,
 	}
 }
 
@@ -238,7 +248,11 @@ func (sched *StdScheduler) executeAndReschedule() {
 
 	// execute the Job
 	if !isOutdated(item.priority) {
-		go item.Job.Execute()
+		if sched.opts.BlockingExecution {
+			item.Job.Execute()
+		} else {
+			go item.Job.Execute()
+		}
 	}
 
 	// reschedule the Job
