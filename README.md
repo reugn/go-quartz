@@ -13,8 +13,10 @@ Inspired by the [Quartz](https://github.com/quartz-scheduler/quartz) Java schedu
 Scheduler interface
 ```go
 type Scheduler interface {
-	// Start starts the scheduler.
-	Start()
+	// Start starts the scheduler. The scheduler will run until
+	// the Stop method is called or the context is canceled. Use
+	// the Wait method to block until all running jobs have completed.
+	Start(context.Context)
 	// IsStarted determines whether the scheduler has been started.
 	IsStarted() bool
 	// ScheduleJob schedules a job using a specified trigger.
@@ -29,6 +31,11 @@ type Scheduler interface {
 	Clear()
 	// Stop shutdowns the scheduler.
 	Stop()
+	// Wait blocks until the scheduler stops running and all jobs
+	// have returned. Wait will return when the context passed to
+	// it has expired. Until the context passed to start is
+	// cancelled or Stop is called directly.
+	Wait(context.Context)
 }
 ```
 Implemented Schedulers
@@ -52,7 +59,7 @@ Job interface. Any type that implements it can be scheduled.
 ```go
 type Job interface {
 	// Execute is called by a Scheduler when the Trigger associated with this job fires.
-	Execute()
+	Execute(context.Context)
 	// Description returns the description of the Job.
 	Description() string
 	// Key returns the unique key for the Job.
@@ -77,16 +84,18 @@ Implemented Jobs
 
 ## Examples
 ```go
+ctx := context.Background()
 sched := quartz.NewStdScheduler()
-sched.Start()
+sched.Start(ctx)
 cronTrigger, _ := quartz.NewCronTrigger("1/5 * * * * *")
 shellJob := quartz.NewShellJob("ls -la")
 curlJob, _ := quartz.NewCurlJob(http.MethodGet, "http://worldclockapi.com/api/json/est/now", "", nil)
-functionJob := quartz.NewFunctionJob(func() (int, error) { return 42, nil })
+functionJob := quartz.NewFunctionJob(func(_ context.Context) (int, error) { return 42, nil })
 sched.ScheduleJob(shellJob, cronTrigger)
 sched.ScheduleJob(curlJob, quartz.NewSimpleTrigger(time.Second*7))
 sched.ScheduleJob(functionJob, quartz.NewSimpleTrigger(time.Second*5))
 sched.Stop()
+sched.Wait(ctx)
 ```
 More code samples can be found in the examples directory.
 

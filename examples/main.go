@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -10,16 +11,20 @@ import (
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
-	go sampleJobs(wg)
-	go sampleScheduler(wg)
+	go sampleJobs(ctx, wg)
+	go sampleScheduler(ctx, wg)
 
 	wg.Wait()
 }
 
-func sampleScheduler(wg *sync.WaitGroup) {
+func sampleScheduler(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	sched := quartz.NewStdScheduler()
 	cronTrigger, err := quartz.NewCronTrigger("1/3 * * * * *")
 	if err != nil {
@@ -28,7 +33,8 @@ func sampleScheduler(wg *sync.WaitGroup) {
 	}
 
 	cronJob := PrintJob{"Cron job"}
-	sched.Start()
+	sched.Start(ctx)
+
 	sched.ScheduleJob(&PrintJob{"Ad hoc Job"}, quartz.NewRunOnceTrigger(time.Second*5))
 	sched.ScheduleJob(&PrintJob{"First job"}, quartz.NewSimpleTrigger(time.Second*12))
 	sched.ScheduleJob(&PrintJob{"Second job"}, quartz.NewSimpleTrigger(time.Second*6))
@@ -50,12 +56,13 @@ func sampleScheduler(wg *sync.WaitGroup) {
 
 	time.Sleep(time.Second * 2)
 	sched.Stop()
-	wg.Done()
+	sched.Wait(ctx)
 }
 
-func sampleJobs(wg *sync.WaitGroup) {
+func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 	sched := quartz.NewStdScheduler()
-	sched.Start()
+	sched.Start(ctx)
 
 	cronTrigger, err := quartz.NewCronTrigger("1/5 * * * * *")
 	if err != nil {
@@ -69,7 +76,7 @@ func sampleJobs(wg *sync.WaitGroup) {
 		fmt.Println(err)
 		return
 	}
-	functionJob := quartz.NewFunctionJobWithDesc("42", func() (int, error) { return 42, nil })
+	functionJob := quartz.NewFunctionJobWithDesc("42", func(_ context.Context) (int, error) { return 42, nil })
 
 	sched.ScheduleJob(shellJob, cronTrigger)
 	sched.ScheduleJob(curlJob, quartz.NewSimpleTrigger(time.Second*7))
@@ -84,5 +91,5 @@ func sampleJobs(wg *sync.WaitGroup) {
 
 	time.Sleep(time.Second * 2)
 	sched.Stop()
-	wg.Done()
+	sched.Wait(ctx)
 }

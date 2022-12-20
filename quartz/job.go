@@ -2,6 +2,7 @@ package quartz
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 // to be performed.
 type Job interface {
 	// Execute is called by a Scheduler when the Trigger associated with this job fires.
-	Execute()
+	Execute(context.Context)
 
 	// Description returns the description of the Job.
 	Description() string
@@ -63,8 +64,8 @@ func (sh *ShellJob) Key() int {
 }
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
-func (sh *ShellJob) Execute() {
-	out, err := exec.Command("sh", "-c", sh.Cmd).Output()
+func (sh *ShellJob) Execute(ctx context.Context) {
+	out, err := exec.CommandContext(ctx, "sh", "-c", sh.Cmd).Output()
 	if err != nil {
 		sh.JobStatus = FAILURE
 		sh.Result = err.Error()
@@ -128,8 +129,9 @@ func (cu *CurlJob) Key() int {
 }
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
-func (cu *CurlJob) Execute() {
+func (cu *CurlJob) Execute(ctx context.Context) {
 	client := &http.Client{}
+	cu.request = cu.request.WithContext(ctx)
 	resp, err := client.Do(cu.request)
 	if err != nil {
 		cu.JobStatus = FAILURE

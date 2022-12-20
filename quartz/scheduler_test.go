@@ -1,6 +1,7 @@
 package quartz_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -9,6 +10,9 @@ import (
 )
 
 func TestScheduler(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	sched := quartz.NewStdScheduler()
 	var jobKeys [4]int
 
@@ -28,7 +32,7 @@ func TestScheduler(t *testing.T) {
 	assertEqual(t, err, nil)
 	jobKeys[3] = errCurlJob.Key()
 
-	sched.Start()
+	sched.Start(ctx)
 	sched.ScheduleJob(shellJob, quartz.NewSimpleTrigger(time.Millisecond*800))
 	sched.ScheduleJob(curlJob, quartz.NewRunOnceTrigger(time.Millisecond))
 	sched.ScheduleJob(errShellJob, quartz.NewRunOnceTrigger(time.Millisecond))
