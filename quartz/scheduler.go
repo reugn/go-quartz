@@ -108,6 +108,7 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 	}
 
 	ctx, sched.cancel = context.WithCancel(ctx)
+	go func() { <-ctx.Done(); sched.Stop() }()
 	// start the feed reader
 	go sched.startFeedReader(ctx)
 
@@ -269,7 +270,7 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	// reschedule the Job
 	nextRunTime, err := it.Trigger.NextFireTime(it.priority)
 	if err != nil {
-		log.Printf("The Job '%s' got out the execution loop.", it.Job.Description())
+		log.Printf("The Job '%s' got out the execution loop: %q", it.Job.Description(), err.Error())
 		return
 	}
 
