@@ -56,17 +56,22 @@ type StdScheduler struct {
 }
 
 type StdSchedulerOptions struct {
+	// When true, the scheduler will run jobs synchronously,
+	// waiting for each exceution instance of the job to return
+	// before starting the next execution. Running with this
+	// option effectively serializes all job execution.
 	BlockingExecution bool
 }
 
 // Verify StdScheduler satisfies the Scheduler interface.
 var _ Scheduler = (*StdScheduler)(nil)
 
-// NewStdScheduler returns a new StdScheduler.
-func NewStdScheduler() *StdScheduler {
+// NewStdScheduler returns a new StdScheduler with the default configuration.
+func NewStdScheduler() Scheduler {
 	return NewStdSchedulerWithOptions(StdSchedulerOptions{})
 }
 
+// NewStdSchedulerWithOptions returns a new StdScheduler configured as specified.
 func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
 	return &StdScheduler{
 		queue:     &priorityQueue{},
