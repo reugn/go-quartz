@@ -35,10 +35,10 @@ func TestScheduler(t *testing.T) {
 	jobKeys[3] = errCurlJob.Key()
 
 	sched.Start(ctx)
-	sched.ScheduleJob(shellJob, quartz.NewSimpleTrigger(time.Millisecond*800))
-	sched.ScheduleJob(curlJob, quartz.NewRunOnceTrigger(time.Millisecond))
-	sched.ScheduleJob(errShellJob, quartz.NewRunOnceTrigger(time.Millisecond))
-	sched.ScheduleJob(errCurlJob, quartz.NewSimpleTrigger(time.Millisecond*800))
+	sched.ScheduleJob(ctx, shellJob, quartz.NewSimpleTrigger(time.Millisecond*800))
+	sched.ScheduleJob(ctx, curlJob, quartz.NewRunOnceTrigger(time.Millisecond))
+	sched.ScheduleJob(ctx, errShellJob, quartz.NewRunOnceTrigger(time.Millisecond))
+	sched.ScheduleJob(ctx, errCurlJob, quartz.NewSimpleTrigger(time.Millisecond*800))
 
 	time.Sleep(time.Second)
 	scheduledJobKeys := sched.GetJobKeys()
@@ -89,17 +89,19 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 			sched.Start(ctx)
 
 			var n int64
-			sched.ScheduleJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
-				atomic.AddInt64(&n, 1)
-				timer := time.NewTimer(time.Hour)
-				defer timer.Stop()
-				select {
-				case <-timer.C:
-					return false, nil
-				case <-ctx.Done():
-					return true, nil
-				}
-			}), quartz.NewSimpleTrigger(time.Millisecond))
+			sched.ScheduleJob(ctx,
+				quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
+					atomic.AddInt64(&n, 1)
+					timer := time.NewTimer(time.Hour)
+					defer timer.Stop()
+					select {
+					case <-timer.C:
+						return false, nil
+					case <-ctx.Done():
+						return true, nil
+					}
+				}),
+				quartz.NewSimpleTrigger(time.Millisecond))
 
 			ticker := time.NewTicker(4 * time.Millisecond)
 			<-ticker.C
@@ -197,7 +199,7 @@ func TestSchedulerCancel(t *testing.T) {
 			}
 
 			for i := 0; i < 100; i++ {
-				if err := sched.ScheduleJob(
+				if err := sched.ScheduleJob(ctx,
 					quartz.NewFunctionJob(hourJob),
 					quartz.NewSimpleTrigger(100*time.Millisecond),
 				); err != nil {
@@ -229,7 +231,7 @@ func TestSchedulerCancel(t *testing.T) {
 
 			sched.Wait(waitCtx)
 			if err := waitCtx.Err(); err != nil {
-				t.Fatal("waiting timed out before resources were released")
+				t.Fatal("waiting timed out before resources were released", err)
 			}
 
 			endingRoutines := runtime.NumGoroutine()
