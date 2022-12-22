@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"sync/atomic"
 )
 
 // Job represents an interface to be implemented by structs which represent a 'job'
@@ -148,4 +149,27 @@ func (cu *CurlJob) Execute() {
 
 	cu.StatusCode = resp.StatusCode
 	cu.Response = string(body)
+}
+
+type singleRunJob struct {
+	Job
+	isRunning *atomic.Bool
+}
+
+func (j *singleRunJob) Execute() {
+	if wasRunning := j.isRunning.Swap(true); wasRunning {
+		return
+	}
+
+	j.Job.Execute()
+
+	j.isRunning.Store(false)
+}
+
+func NewIsolatedInstanceJob(j Job) Job {
+	return &singleRunJob{
+		Job:       j,
+		isRunning: &atomic.Bool{},
+	}
+
 }
