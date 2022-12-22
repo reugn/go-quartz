@@ -51,6 +51,7 @@ type StdScheduler struct {
 	interrupt chan struct{}
 	exit      chan struct{}
 	feeder    chan *item
+	dispatch  chan *item
 	started   bool
 	opts      StdSchedulerOptions
 }
@@ -61,6 +62,14 @@ type StdSchedulerOptions struct {
 	// before starting the next execution. Running with this
 	// option effectively serializes all job execution.
 	BlockingExecution bool
+
+	// When greater than 0, all jobs will be dispatched to a pool
+	// of goroutines of WorkerLimit size to limit the total number
+	// of processes usable by the Scheduler. If all worker threads
+	// are in use, job scheduling will wait till a job can be
+	// dispatched. If BlockingExecution is set, then WorkerLimit
+	// is ignored.
+	WorkerLimit int
 }
 
 // Verify StdScheduler satisfies the Scheduler interface.
@@ -78,6 +87,7 @@ func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
 		interrupt: make(chan struct{}, 1),
 		exit:      nil,
 		feeder:    make(chan *item),
+		dispatch:  make(chan *item),
 		opts:      opts,
 	}
 }
@@ -116,6 +126,9 @@ func (sched *StdScheduler) Start() {
 
 	// start scheduler execution loop
 	go sched.startExecutionLoop()
+
+	// starts worker pool when WorkerLimit is > 0
+	sched.startWorkers()
 
 	sched.started = true
 }
@@ -222,6 +235,25 @@ func (sched *StdScheduler) startExecutionLoop() {
 	}
 }
 
+func (sched *StdScheduler) startWorkers() {
+	if sched.opts.WorkerLimit > 0 {
+		for i := 0; i < sched.opts.WorkerLimit; i++ {
+			go func() {
+				for {
+					select {
+					// case <-ctx.Done():
+					//	return
+					case <-sched.exit:
+						return
+					case item := <-sched.dispatch:
+						item.Job.Execute()
+					}
+				}
+			}()
+		}
+	}
+}
+
 func (sched *StdScheduler) queueLen() int {
 	sched.Lock()
 	defer sched.Unlock()
@@ -255,6 +287,12 @@ func (sched *StdScheduler) executeAndReschedule() {
 	if !isOutdated(item.priority) {
 		if sched.opts.BlockingExecution {
 			item.Job.Execute()
+		} else if sched.opts.WorkerLimit > 0 {
+			select {
+			case sched.dispatch <- item:
+			case <-sched.exit:
+				return
+			}
 		} else {
 			go item.Job.Execute()
 		}
@@ -266,7 +304,6 @@ func (sched *StdScheduler) executeAndReschedule() {
 		log.Printf("The Job '%s' got out the execution loop.", item.Job.Description())
 		return
 	}
-
 	item.priority = nextRunTime
 	sched.feeder <- item
 }
