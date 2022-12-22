@@ -2,6 +2,7 @@ package quartz
 
 import (
 	"container/heap"
+	"context"
 	"errors"
 	"log"
 	"sync"
@@ -19,8 +20,10 @@ type ScheduledJob struct {
 // Schedulers are responsible for executing Jobs when their associated
 // Triggers fire (when their scheduled time arrives).
 type Scheduler interface {
-	// Start starts the scheduler.
-	Start()
+	// Start starts the scheduler. The scheduler will run until
+	// the Stop method is called or the context is canceled. Use
+	// the Wait method to block until all running jobs have completed.
+	Start(context.Context)
 
 	// IsStarted determines whether the scheduler has been started.
 	IsStarted() bool
@@ -40,18 +43,25 @@ type Scheduler interface {
 	// Clear removes all of the scheduled jobs.
 	Clear()
 
+	// Wait blocks until the scheduler stops running and all jobs
+	// have returned. Wait will return when the context passed to
+	// it has expired. Until the context passed to start is
+	// cancelled or Stop is called directly.
+	Wait(context.Context)
+
 	// Stop shutdowns the scheduler.
 	Stop()
 }
 
 // StdScheduler implements the quartz.Scheduler interface.
 type StdScheduler struct {
-	sync.Mutex
+	mtx       sync.Mutex
 	queue     *priorityQueue
 	interrupt chan struct{}
-	exit      chan struct{}
+	signal    chan struct{}
 	feeder    chan *item
 	started   bool
+	cancel    context.CancelFunc
 }
 
 // Verify StdScheduler satisfies the Scheduler interface.
@@ -62,8 +72,9 @@ func NewStdScheduler() *StdScheduler {
 	return &StdScheduler{
 		queue:     &priorityQueue{},
 		interrupt: make(chan struct{}, 1),
-		exit:      nil,
+		cancel:    func() {},
 		feeder:    make(chan *item),
+		signal:    make(chan struct{}),
 	}
 }
 
@@ -74,35 +85,46 @@ func (sched *StdScheduler) ScheduleJob(job Job, trigger Trigger) error {
 		return err
 	}
 
-	sched.feeder <- &item{
+	select {
+	case sched.feeder <- &item{
 		Job:      job,
 		Trigger:  trigger,
 		priority: nextRunTime,
 		index:    0,
+	}:
+		return nil
+	case <-sched.signal:
+		return context.Canceled
 	}
-
-	return nil
 }
 
 // Start starts the StdScheduler execution loop.
-func (sched *StdScheduler) Start() {
-	sched.Lock()
-	defer sched.Unlock()
+func (sched *StdScheduler) Start(ctx context.Context) {
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
 
 	if sched.started {
 		return
 	}
 
-	// reset the exit channel
-	sched.exit = make(chan struct{})
-
+	ctx, sched.cancel = context.WithCancel(ctx)
+	go func() { <-ctx.Done(); sched.Stop() }()
 	// start the feed reader
-	go sched.startFeedReader()
+	go sched.startFeedReader(ctx)
 
 	// start scheduler execution loop
-	go sched.startExecutionLoop()
+	go sched.startExecutionLoop(ctx)
 
 	sched.started = true
+	sched.signal = make(chan struct{})
+}
+
+// Wait blocks until the scheduler shuts down.
+func (sched *StdScheduler) Wait(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case <-sched.signal:
+	}
 }
 
 // IsStarted determines whether the scheduler has been started.
@@ -112,8 +134,8 @@ func (sched *StdScheduler) IsStarted() bool {
 
 // GetJobKeys returns the keys of all of the scheduled jobs.
 func (sched *StdScheduler) GetJobKeys() []int {
-	sched.Lock()
-	defer sched.Unlock()
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
 
 	keys := make([]int, 0, sched.queue.Len())
 	for _, item := range *sched.queue {
@@ -125,8 +147,8 @@ func (sched *StdScheduler) GetJobKeys() []int {
 
 // GetScheduledJob returns the ScheduledJob with the specified key.
 func (sched *StdScheduler) GetScheduledJob(key int) (*ScheduledJob, error) {
-	sched.Lock()
-	defer sched.Unlock()
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
 
 	for _, item := range *sched.queue {
 		if item.Job.Key() == key {
@@ -143,8 +165,8 @@ func (sched *StdScheduler) GetScheduledJob(key int) (*ScheduledJob, error) {
 
 // DeleteJob removes the Job with the specified key if present.
 func (sched *StdScheduler) DeleteJob(key int) error {
-	sched.Lock()
-	defer sched.Unlock()
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
 
 	for i, item := range *sched.queue {
 		if item.Job.Key() == key {
@@ -158,8 +180,8 @@ func (sched *StdScheduler) DeleteJob(key int) error {
 
 // Clear removes all of the scheduled jobs.
 func (sched *StdScheduler) Clear() {
-	sched.Lock()
-	defer sched.Unlock()
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
 
 	// reset the job queue
 	sched.queue = &priorityQueue{}
@@ -167,25 +189,26 @@ func (sched *StdScheduler) Clear() {
 
 // Stop exits the StdScheduler execution loop.
 func (sched *StdScheduler) Stop() {
-	sched.Lock()
-	defer sched.Unlock()
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
 
 	if !sched.started {
 		return
 	}
 
 	log.Printf("Closing the StdScheduler.")
-	close(sched.exit)
-
+	sched.cancel()
 	sched.started = false
+	close(sched.signal)
 }
 
-func (sched *StdScheduler) startExecutionLoop() {
+func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
+
 	for {
 		if sched.queueLen() == 0 {
 			select {
 			case <-sched.interrupt:
-			case <-sched.exit:
+			case <-ctx.Done():
 				log.Printf("Exit the empty execution loop.")
 				return
 			}
@@ -193,12 +216,12 @@ func (sched *StdScheduler) startExecutionLoop() {
 			t := time.NewTimer(sched.calculateNextTick())
 			select {
 			case <-t.C:
-				sched.executeAndReschedule()
+				sched.executeAndReschedule(ctx)
 
 			case <-sched.interrupt:
 				t.Stop()
 
-			case <-sched.exit:
+			case <-ctx.Done():
 				log.Printf("Exit the execution loop.")
 				t.Stop()
 				return
@@ -208,69 +231,79 @@ func (sched *StdScheduler) startExecutionLoop() {
 }
 
 func (sched *StdScheduler) queueLen() int {
-	sched.Lock()
-	defer sched.Unlock()
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
 
 	return sched.queue.Len()
 }
 
 func (sched *StdScheduler) calculateNextTick() time.Duration {
-	sched.Lock()
 	var interval int64
+
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
 	if sched.queue.Len() > 0 {
 		interval = parkTime(sched.queue.Head().priority)
 	}
-	sched.Unlock()
 
 	return time.Duration(interval)
 }
 
-func (sched *StdScheduler) executeAndReschedule() {
+func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	// return if the job queue is empty
 	if sched.queueLen() == 0 {
 		return
 	}
 
 	// fetch an item
-	sched.Lock()
-	item := heap.Pop(sched.queue).(*item)
-	sched.Unlock()
+	var it *item
+	func() {
+		sched.mtx.Lock()
+		defer sched.mtx.Unlock()
+		it = heap.Pop(sched.queue).(*item)
+	}()
 
 	// execute the Job
-	if !isOutdated(item.priority) {
-		go item.Job.Execute()
+	if !isOutdated(it.priority) {
+		go it.Job.Execute(ctx)
 	}
 
 	// reschedule the Job
-	nextRunTime, err := item.Trigger.NextFireTime(item.priority)
+	nextRunTime, err := it.Trigger.NextFireTime(it.priority)
 	if err != nil {
-		log.Printf("The Job '%s' got out the execution loop.", item.Job.Description())
+		log.Printf("The Job '%s' got out the execution loop: %q", it.Job.Description(), err.Error())
 		return
 	}
 
-	item.priority = nextRunTime
-	sched.feeder <- item
+	it.priority = nextRunTime
+	select {
+	case <-ctx.Done():
+	case sched.feeder <- it:
+	}
 }
 
-func (sched *StdScheduler) startFeedReader() {
+func (sched *StdScheduler) startFeedReader(ctx context.Context) {
 	for {
 		select {
 		case item := <-sched.feeder:
-			sched.Lock()
-			heap.Push(sched.queue, item)
-			sched.reset()
-			sched.Unlock()
+			func() {
+				sched.mtx.Lock()
+				defer sched.mtx.Unlock()
 
-		case <-sched.exit:
+				heap.Push(sched.queue, item)
+				sched.reset(ctx)
+			}()
+		case <-ctx.Done():
 			log.Printf("Exit the feed reader.")
 			return
 		}
 	}
 }
 
-func (sched *StdScheduler) reset() {
+func (sched *StdScheduler) reset(ctx context.Context) {
 	select {
 	case sched.interrupt <- struct{}{}:
+	case <-ctx.Done():
 	default:
 	}
 }
