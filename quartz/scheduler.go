@@ -141,7 +141,7 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 	go sched.startExecutionLoop(ctx)
 
 	// starts worker pool when WorkerLimit is > 0
-	sched.startWorkers()
+	sched.startWorkers(ctx)
 
 	sched.started = true
 	sched.signal = make(chan struct{})
@@ -258,18 +258,16 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 	}
 }
 
-func (sched *StdScheduler) startWorkers() {
+func (sched *StdScheduler) startWorkers(ctx context.Context) {
 	if sched.opts.WorkerLimit > 0 {
 		for i := 0; i < sched.opts.WorkerLimit; i++ {
 			go func() {
 				for {
 					select {
-					// case <-ctx.Done():
-					//	return
-					case <-sched.exit:
+					case <-ctx.Done():
 						return
 					case item := <-sched.dispatch:
-						item.Job.Execute()
+						item.Job.Execute(ctx)
 					}
 				}
 			}()
@@ -311,18 +309,18 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	}()
 
 	// execute the Job
-	if !isOutdated(item.priority) {
+	if !isOutdated(it.priority) {
 		switch {
 		case sched.opts.BlockingExecution:
-			item.Job.Execute(ctx)
+			it.Job.Execute(ctx)
 		case sched.opts.WorkerLimit > 0:
 			select {
-			case sched.dispatch <- item:
+			case sched.dispatch <- it:
 			case <-ctx.Done():
 				return
 			}
 		default:
-			go item.Job.Execute(ctx)
+			go it.Job.Execute(ctx)
 		}
 	}
 

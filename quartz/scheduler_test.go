@@ -77,10 +77,10 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 				sched := quartz.NewStdSchedulerWithOptions(opts)
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer cancel()
-				sched.Start()
+				sched.Start(ctx)
 
 				var n int
-				sched.ScheduleJob(quartz.NewFunctionJob(func() (bool, error) {
+				sched.ScheduleJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
 					n++
 					timer := time.NewTimer(time.Hour)
 					defer timer.Stop()
