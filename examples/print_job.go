@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/reugn/go-quartz/quartz"
@@ -22,6 +23,6 @@ func (pj *PrintJob) Key() int {
 }
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
-func (pj *PrintJob) Execute() {
+func (pj *PrintJob) Execute(_ context.Context) {
 	fmt.Println("Executing " + pj.Description())
 }

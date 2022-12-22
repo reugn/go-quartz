@@ -1,11 +1,12 @@
 package quartz
 
 import (
+	"context"
 	"fmt"
 )
 
 // Function represents an argument-less function which returns a generic type R and a possible error.
-type Function[R any] func() (R, error)
+type Function[R any] func(context.Context) (R, error)
 
 // FunctionJob represents a Job that invokes the passed Function, implements the quartz.Job interface.
 type FunctionJob[R any] struct {
@@ -50,8 +51,8 @@ func (f *FunctionJob[R]) Key() int {
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 // It invokes the held function, setting the results in Result and Error members.
-func (f *FunctionJob[R]) Execute() {
-	result, err := (*f.function)()
+func (f *FunctionJob[R]) Execute(ctx context.Context) {
+	result, err := (*f.function)(ctx)
 	if err != nil {
 		f.JobStatus = FAILURE
 		f.Result = nil
