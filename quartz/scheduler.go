@@ -285,15 +285,16 @@ func (sched *StdScheduler) executeAndReschedule() {
 
 	// execute the Job
 	if !isOutdated(item.priority) {
-		if sched.opts.BlockingExecution {
+		switch {
+		case sched.opts.BlockingExecution:
 			item.Job.Execute()
-		} else if sched.opts.WorkerLimit > 0 {
+		case sched.opts.WorkerLimit > 0:
 			select {
 			case sched.dispatch <- item:
 			case <-sched.exit:
 				return
 			}
-		} else {
+		default:
 			go item.Job.Execute()
 		}
 	}
