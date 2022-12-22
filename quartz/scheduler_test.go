@@ -148,7 +148,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 					case <-ticker.C:
 						num := atomic.LoadInt64(&n)
 						if num > int64(opts.WorkerLimit) {
-							t.Errorf("on iter %d n %d was more than limt %d",
+							t.Errorf("on iter %d n %d was more than limit %d",
 								iters, num, opts.WorkerLimit,
 							)
 						}
