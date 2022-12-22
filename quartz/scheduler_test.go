@@ -126,7 +126,6 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 							)
 						}
 						lastN = n
-						t.Log(n)
 					}
 				}
 			default:
