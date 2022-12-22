@@ -92,7 +92,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 				}
 			}), quartz.NewSimpleTrigger(time.Millisecond))
 
-			ticker := time.NewTicker(2 * time.Millisecond)
+			ticker := time.NewTicker(4 * time.Millisecond)
 			<-ticker.C
 			if n == 0 {
 				t.Error("job should have run once")
