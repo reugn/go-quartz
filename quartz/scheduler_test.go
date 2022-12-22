@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -66,7 +67,7 @@ func TestScheduler(t *testing.T) {
 }
 
 func TestSchedulerBlockingSemantics(t *testing.T) {
-	for _, tt := range []string{"Blocking", "NonBlocking"} {
+	for _, tt := range []string{"Blocking", "NonBlocking", "WorkerSmall", "WorkerLarge"} {
 		t.Run(tt, func(t *testing.T) {
 			var opts quartz.StdSchedulerOptions
 			switch tt {
@@ -74,63 +75,87 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 				opts.BlockingExecution = true
 			case "NonBlocking":
 				opts.BlockingExecution = false
-				sched := quartz.NewStdSchedulerWithOptions(opts)
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-				defer cancel()
-				sched.Start(ctx)
+			case "WorkerSmall":
+				opts.WorkerLimit = 4
+			case "WorkerLarge":
+				opts.WorkerLimit = 16
+			default:
+				t.Fatal("unknown semantic:", tt)
+			}
 
-				var n int
-				sched.ScheduleJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
-					n++
-					timer := time.NewTimer(time.Hour)
-					defer timer.Stop()
+			sched := quartz.NewStdSchedulerWithOptions(opts)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			sched.Start(ctx)
+
+			n := &atomic.Int64{}
+			sched.ScheduleJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
+				n.Add(1)
+				timer := time.NewTimer(time.Hour)
+				defer timer.Stop()
+				select {
+				case <-timer.C:
+					return false, nil
+				case <-ctx.Done():
+					return true, nil
+				}
+			}), quartz.NewSimpleTrigger(time.Millisecond))
+
+			ticker := time.NewTicker(4 * time.Millisecond)
+			<-ticker.C
+			if n.Load() == 0 {
+				t.Error("job should have run at least once")
+			}
+
+			switch tt {
+			case "Blocking":
+			BLOCKING:
+				for iters := 0; iters < 100; iters++ {
+					iters++
 					select {
-					case <-timer.C:
-						return false, nil
 					case <-ctx.Done():
-						return true, nil
-					}
-				}), quartz.NewSimpleTrigger(time.Millisecond))
-
-				ticker := time.NewTicker(4 * time.Millisecond)
-				<-ticker.C
-				if n == 0 {
-					t.Error("job should have run once")
-				}
-
-				switch tt {
-				case "Blocking":
-				BLOCKING:
-					for iters := 0; iters < 100; iters++ {
-						iters++
-						select {
-						case <-ctx.Done():
-							break BLOCKING
-						case <-ticker.C:
-							if n != 1 {
-								t.Error("job should have only run once", n)
-							}
+						break BLOCKING
+					case <-ticker.C:
+						num := n.Load()
+						if num != 1 {
+							t.Error("job should have only run once", num)
 						}
 					}
-				case "NonBlocking":
-					lastN := 0
-				NONBLOCKING:
-					for iters := 0; iters < 100; iters++ {
-						select {
-						case <-ctx.Done():
-							break NONBLOCKING
-						case <-ticker.C:
-							if n <= lastN {
-								t.Errorf("on iter %d n did not increase %d",
-									iters, n,
-								)
-							}
-							lastN = n
+				}
+			case "NonBlocking":
+				var lastN int64
+			NONBLOCKING:
+				for iters := 0; iters < 100; iters++ {
+					select {
+					case <-ctx.Done():
+						break NONBLOCKING
+					case <-ticker.C:
+						num := n.Load()
+						if num <= lastN {
+							t.Errorf("on iter %d n did not increase %d",
+								iters, num,
+							)
+						}
+						lastN = num
+					}
+				}
+			case "WorkerSmall", "WorkerLarge":
+			WORKERS:
+				for iters := 0; iters < 100; iters++ {
+					select {
+					case <-ctx.Done():
+						break WORKERS
+					case <-ticker.C:
+						num := n.Load()
+						if num > int64(opts.WorkerLimit) {
+							t.Errorf("on iter %d n %d was more than limt %d",
+								iters, num, opts.WorkerLimit,
+							)
 						}
 					}
-				default:
-					t.Fatal("unknown test:", tt)
 				}
+			default:
+				t.Fatal("unknown test:", tt)
 			}
 		})
 	}
