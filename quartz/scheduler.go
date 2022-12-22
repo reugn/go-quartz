@@ -119,6 +119,7 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 	sched.signal = make(chan struct{})
 }
 
+// Wait blocks until the scheduler shuts down.
 func (sched *StdScheduler) Wait(ctx context.Context) {
 	select {
 	case <-ctx.Done():
