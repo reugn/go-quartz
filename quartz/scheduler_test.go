@@ -77,11 +77,9 @@ func TestSchedulerCancel(t *testing.T) {
 		}
 	}
 	for _, tt := range []string{"context", "stop"} {
-		if tt == "stop" {
-			// give the go runtime to exit many threads
-			// before the second case.
-			time.Sleep(time.Millisecond)
-		}
+		// give the go runtime to exit many threads
+		// before the second case.
+		time.Sleep(time.Millisecond)
 		t.Run("CloseMethod_"+tt, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
