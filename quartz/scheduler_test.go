@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -65,6 +66,101 @@ func TestScheduler(t *testing.T) {
 	assertEqual(t, errCurlJob.JobStatus, quartz.FAILURE)
 }
 
+func TestSchedulerBlockingSemantics(t *testing.T) {
+	for _, tt := range []string{"Blocking", "NonBlocking", "WorkerSmall", "WorkerLarge"} {
+		t.Run(tt, func(t *testing.T) {
+			var opts quartz.StdSchedulerOptions
+			switch tt {
+			case "Blocking":
+				opts.BlockingExecution = true
+			case "NonBlocking":
+				opts.BlockingExecution = false
+			case "WorkerSmall":
+				opts.WorkerLimit = 4
+			case "WorkerLarge":
+				opts.WorkerLimit = 16
+			default:
+				t.Fatal("unknown semantic:", tt)
+			}
+
+			sched := quartz.NewStdSchedulerWithOptions(opts)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			sched.Start(ctx)
+
+			var n int64
+			sched.ScheduleJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
+				atomic.AddInt64(&n, 1)
+				timer := time.NewTimer(time.Hour)
+				defer timer.Stop()
+				select {
+				case <-timer.C:
+					return false, nil
+				case <-ctx.Done():
+					return true, nil
+				}
+			}), quartz.NewSimpleTrigger(time.Millisecond))
+
+			ticker := time.NewTicker(4 * time.Millisecond)
+			<-ticker.C
+			if atomic.LoadInt64(&n) == 0 {
+				t.Error("job should have run at least once")
+			}
+
+			switch tt {
+			case "Blocking":
+			BLOCKING:
+				for iters := 0; iters < 100; iters++ {
+					iters++
+					select {
+					case <-ctx.Done():
+						break BLOCKING
+					case <-ticker.C:
+						num := atomic.LoadInt64(&n)
+						if num != 1 {
+							t.Error("job should have only run once", num)
+						}
+					}
+				}
+			case "NonBlocking":
+				var lastN int64
+			NONBLOCKING:
+				for iters := 0; iters < 100; iters++ {
+					select {
+					case <-ctx.Done():
+						break NONBLOCKING
+					case <-ticker.C:
+						num := atomic.LoadInt64(&n)
+						if num <= lastN {
+							t.Errorf("on iter %d n did not increase %d",
+								iters, num,
+							)
+						}
+						lastN = num
+					}
+				}
+			case "WorkerSmall", "WorkerLarge":
+			WORKERS:
+				for iters := 0; iters < 100; iters++ {
+					select {
+					case <-ctx.Done():
+						break WORKERS
+					case <-ticker.C:
+						num := atomic.LoadInt64(&n)
+						if num > int64(opts.WorkerLimit) {
+							t.Errorf("on iter %d n %d was more than limit %d",
+								iters, num, opts.WorkerLimit,
+							)
+						}
+					}
+				}
+			default:
+				t.Fatal("unknown test:", tt)
+			}
+		})
+	}
+
+}
 func TestSchedulerCancel(t *testing.T) {
 	hourJob := func(ctx context.Context) (bool, error) {
 		timer := time.NewTimer(time.Hour)

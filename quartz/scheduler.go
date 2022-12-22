@@ -59,22 +59,47 @@ type StdScheduler struct {
 	queue     *priorityQueue
 	interrupt chan struct{}
 	signal    chan struct{}
-	feeder    chan *item
-	started   bool
 	cancel    context.CancelFunc
+	feeder    chan *item
+	dispatch  chan *item
+	started   bool
+	opts      StdSchedulerOptions
+}
+
+type StdSchedulerOptions struct {
+	// When true, the scheduler will run jobs synchronously,
+	// waiting for each exceution instance of the job to return
+	// before starting the next execution. Running with this
+	// option effectively serializes all job execution.
+	BlockingExecution bool
+
+	// When greater than 0, all jobs will be dispatched to a pool
+	// of goroutines of WorkerLimit size to limit the total number
+	// of processes usable by the Scheduler. If all worker threads
+	// are in use, job scheduling will wait till a job can be
+	// dispatched. If BlockingExecution is set, then WorkerLimit
+	// is ignored.
+	WorkerLimit int
 }
 
 // Verify StdScheduler satisfies the Scheduler interface.
 var _ Scheduler = (*StdScheduler)(nil)
 
-// NewStdScheduler returns a new StdScheduler.
-func NewStdScheduler() *StdScheduler {
+// NewStdScheduler returns a new StdScheduler with the default configuration.
+func NewStdScheduler() Scheduler {
+	return NewStdSchedulerWithOptions(StdSchedulerOptions{})
+}
+
+// NewStdSchedulerWithOptions returns a new StdScheduler configured as specified.
+func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
 	return &StdScheduler{
 		queue:     &priorityQueue{},
 		interrupt: make(chan struct{}, 1),
 		cancel:    func() {},
 		feeder:    make(chan *item),
 		signal:    make(chan struct{}),
+		dispatch:  make(chan *item),
+		opts:      opts,
 	}
 }
 
@@ -114,6 +139,9 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 
 	// start scheduler execution loop
 	go sched.startExecutionLoop(ctx)
+
+	// starts worker pool when WorkerLimit is > 0
+	sched.startWorkers(ctx)
 
 	sched.started = true
 	sched.signal = make(chan struct{})
@@ -230,6 +258,23 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 	}
 }
 
+func (sched *StdScheduler) startWorkers(ctx context.Context) {
+	if sched.opts.WorkerLimit > 0 {
+		for i := 0; i < sched.opts.WorkerLimit; i++ {
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case item := <-sched.dispatch:
+						item.Job.Execute(ctx)
+					}
+				}
+			}()
+		}
+	}
+}
+
 func (sched *StdScheduler) queueLen() int {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
@@ -265,7 +310,18 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 
 	// execute the Job
 	if !isOutdated(it.priority) {
-		go it.Job.Execute(ctx)
+		switch {
+		case sched.opts.BlockingExecution:
+			it.Job.Execute(ctx)
+		case sched.opts.WorkerLimit > 0:
+			select {
+			case sched.dispatch <- it:
+			case <-ctx.Done():
+				return
+			}
+		default:
+			go it.Job.Execute(ctx)
+		}
 	}
 
 	// reschedule the Job
@@ -274,7 +330,6 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 		log.Printf("The Job '%s' got out the execution loop: %q", it.Job.Description(), err.Error())
 		return
 	}
-
 	it.priority = nextRunTime
 	select {
 	case <-ctx.Done():
