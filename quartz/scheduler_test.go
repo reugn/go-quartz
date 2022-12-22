@@ -88,9 +88,9 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 			defer cancel()
 			sched.Start(ctx)
 
-			n := &atomic.Int64{}
+			var n int64
 			sched.ScheduleJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
-				n.Add(1)
+				atomic.AddInt64(&n, 1)
 				timer := time.NewTimer(time.Hour)
 				defer timer.Stop()
 				select {
@@ -103,7 +103,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 
 			ticker := time.NewTicker(4 * time.Millisecond)
 			<-ticker.C
-			if n.Load() == 0 {
+			if atomic.LoadInt64(&n) == 0 {
 				t.Error("job should have run at least once")
 			}
 
@@ -116,7 +116,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 					case <-ctx.Done():
 						break BLOCKING
 					case <-ticker.C:
-						num := n.Load()
+						num := atomic.LoadInt64(&n)
 						if num != 1 {
 							t.Error("job should have only run once", num)
 						}
@@ -130,7 +130,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 					case <-ctx.Done():
 						break NONBLOCKING
 					case <-ticker.C:
-						num := n.Load()
+						num := atomic.LoadInt64(&n)
 						if num <= lastN {
 							t.Errorf("on iter %d n did not increase %d",
 								iters, num,
@@ -146,7 +146,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 					case <-ctx.Done():
 						break WORKERS
 					case <-ticker.C:
-						num := n.Load()
+						num := atomic.LoadInt64(&n)
 						if num > int64(opts.WorkerLimit) {
 							t.Errorf("on iter %d n %d was more than limt %d",
 								iters, num, opts.WorkerLimit,
