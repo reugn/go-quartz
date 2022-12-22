@@ -166,6 +166,8 @@ func (j *singleRunJob) Execute() {
 	j.isRunning.Store(false)
 }
 
+// NewIsolatedInstanceJob wraps a job object and ensures that only one
+// instance of the job's Execute method can be called at a time.
 func NewIsolatedInstanceJob(j Job) Job {
 	return &singleRunJob{
 		Job:       j,
