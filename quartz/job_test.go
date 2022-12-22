@@ -15,9 +15,9 @@ import (
 func TestMultipleExecution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	n := &atomic.Int64{}
-	job := quartz.NewIsolatedInstanceJob(quartz.NewFunctionJob(func() (bool, error) {
-		n.Add(1)
+	var n int64
+	job := quartz.NewIsolatedInstanceJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
+		atomic.AddInt64(&n, 1)
 		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
 		select {
@@ -50,7 +50,7 @@ func TestMultipleExecution(t *testing.T) {
 				case <-timer.C:
 					// sleep for a jittered amount of
 					// time, less than 11ms
-					job.Execute()
+					job.Execute(ctx)
 				case <-ctx.Done():
 					return
 				case <-sig:
@@ -67,7 +67,7 @@ func TestMultipleExecution(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		select {
 		case <-ticker.C:
-			if n.Load() != 1 {
+			if atomic.LoadInt64(&n) != 1 {
 				t.Error("only one job should run")
 			}
 		case <-ctx.Done():
@@ -79,7 +79,7 @@ func TestMultipleExecution(t *testing.T) {
 	// stop all of the adding threads without canceling
 	// the context
 	close(sig)
-	if n.Load() != 1 {
+	if atomic.LoadInt64(&n) != 1 {
 		t.Error("only one job should run")
 	}
 }

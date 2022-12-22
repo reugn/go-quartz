@@ -158,14 +158,13 @@ type singleRunJob struct {
 	isRunning *atomic.Bool
 }
 
-func (j *singleRunJob) Execute() {
+func (j *singleRunJob) Execute(ctx context.Context) {
 	if wasRunning := j.isRunning.Swap(true); wasRunning {
 		return
 	}
+	defer j.isRunning.Store(false)
 
-	j.Job.Execute()
-
-	j.isRunning.Store(false)
+	j.Job.Execute(ctx)
 }
 
 // NewIsolatedInstanceJob wraps a job object and ensures that only one
