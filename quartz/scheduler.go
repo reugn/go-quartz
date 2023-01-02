@@ -96,7 +96,6 @@ func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
 		queue:     &priorityQueue{},
 		wg:        &sync.WaitGroup{},
 		interrupt: make(chan struct{}, 1),
-		cancel:    func() {},
 		feeder:    make(chan *item),
 		dispatch:  make(chan *item),
 		opts:      opts,
