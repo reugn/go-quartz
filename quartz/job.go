@@ -160,7 +160,7 @@ type isolatedJob struct {
 }
 
 func (j *isolatedJob) Execute(ctx context.Context) {
-	if wasRunning := j.isRunning.Swap(true); wasRunning.(bool) {
+	if wasRunning := j.isRunning.Swap(true); wasRunning != nil && wasRunning.(bool) {
 		return
 	}
 	defer j.isRunning.Store(false)

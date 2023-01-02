@@ -16,7 +16,7 @@ func TestMultipleExecution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	var n int64
-	job := quartz.NewIsolatedInstanceJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
+	job := quartz.NewIsolatedJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
 		atomic.AddInt64(&n, 1)
 		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
