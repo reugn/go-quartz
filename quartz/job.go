@@ -155,11 +155,12 @@ func (cu *CurlJob) Execute(ctx context.Context) {
 
 type isolatedJob struct {
 	Job
-	isRunning *atomic.Bool
+	// TODO: switch this to an atomic.Bool when upgrading to/past go1.19
+	isRunning *atomic.Value
 }
 
 func (j *isolatedJob) Execute(ctx context.Context) {
-	if wasRunning := j.isRunning.Swap(true); wasRunning {
+	if wasRunning := j.isRunning.Swap(true); wasRunning.(bool) {
 		return
 	}
 	defer j.isRunning.Store(false)
@@ -172,7 +173,7 @@ func (j *isolatedJob) Execute(ctx context.Context) {
 func NewIsolatedJob(j Job) Job {
 	return &isolatedJob{
 		Job:       j,
-		isRunning: &atomic.Bool{},
+		isRunning: &atomic.Value{},
 	}
 
 }
