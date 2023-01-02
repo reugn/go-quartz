@@ -153,12 +153,12 @@ func (cu *CurlJob) Execute(ctx context.Context) {
 	cu.Response = string(body)
 }
 
-type singleRunJob struct {
+type isolatedJob struct {
 	Job
 	isRunning *atomic.Bool
 }
 
-func (j *singleRunJob) Execute(ctx context.Context) {
+func (j *isolatedJob) Execute(ctx context.Context) {
 	if wasRunning := j.isRunning.Swap(true); wasRunning {
 		return
 	}
@@ -167,10 +167,10 @@ func (j *singleRunJob) Execute(ctx context.Context) {
 	j.Job.Execute(ctx)
 }
 
-// NewIsolatedInstanceJob wraps a job object and ensures that only one
+// NewIsolatedJob wraps a job object and ensures that only one
 // instance of the job's Execute method can be called at a time.
-func NewIsolatedInstanceJob(j Job) Job {
-	return &singleRunJob{
+func NewIsolatedJob(j Job) Job {
+	return &isolatedJob{
 		Job:       j,
 		isRunning: &atomic.Bool{},
 	}
