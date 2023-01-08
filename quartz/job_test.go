@@ -57,7 +57,6 @@ func TestMultipleExecution(t *testing.T) {
 					return
 				}
 				timer.Reset(1 + time.Duration(rand.Int63n(10))*time.Millisecond)
-
 			}
 		}()
 	}
