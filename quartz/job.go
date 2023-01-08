@@ -175,5 +175,4 @@ func NewIsolatedJob(j Job) Job {
 		Job:       j,
 		isRunning: &atomic.Value{},
 	}
-
 }
