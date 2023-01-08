@@ -159,6 +159,7 @@ type isolatedJob struct {
 	isRunning *atomic.Value
 }
 
+// Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (j *isolatedJob) Execute(ctx context.Context) {
 	if wasRunning := j.isRunning.Swap(true); wasRunning != nil && wasRunning.(bool) {
 		return
@@ -170,9 +171,9 @@ func (j *isolatedJob) Execute(ctx context.Context) {
 
 // NewIsolatedJob wraps a job object and ensures that only one
 // instance of the job's Execute method can be called at a time.
-func NewIsolatedJob(j Job) Job {
+func NewIsolatedJob(underlying Job) Job {
 	return &isolatedJob{
-		Job:       j,
+		Job:       underlying,
 		isRunning: &atomic.Value{},
 	}
 }
