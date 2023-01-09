@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"sync/atomic"
 )
 
 // Job represents an interface to be implemented by structs which represent a 'job'
@@ -150,4 +151,29 @@ func (cu *CurlJob) Execute(ctx context.Context) {
 
 	cu.StatusCode = resp.StatusCode
 	cu.Response = string(body)
+}
+
+type isolatedJob struct {
+	Job
+	// TODO: switch this to an atomic.Bool when upgrading to/past go1.19
+	isRunning *atomic.Value
+}
+
+// Execute is called by a Scheduler when the Trigger associated with this job fires.
+func (j *isolatedJob) Execute(ctx context.Context) {
+	if wasRunning := j.isRunning.Swap(true); wasRunning != nil && wasRunning.(bool) {
+		return
+	}
+	defer j.isRunning.Store(false)
+
+	j.Job.Execute(ctx)
+}
+
+// NewIsolatedJob wraps a job object and ensures that only one
+// instance of the job's Execute method can be called at a time.
+func NewIsolatedJob(underlying Job) Job {
+	return &isolatedJob{
+		Job:       underlying,
+		isRunning: &atomic.Value{},
+	}
 }
