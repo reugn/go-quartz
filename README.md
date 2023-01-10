@@ -20,7 +20,7 @@ type Scheduler interface {
 	// IsStarted determines whether the scheduler has been started.
 	IsStarted() bool
 	// ScheduleJob schedules a job using a specified trigger.
-	ScheduleJob(job Job, trigger Trigger) error
+	ScheduleJob(ctx context.Context, job Job, trigger Trigger) error
 	// GetJobKeys returns the keys of all of the scheduled jobs.
 	GetJobKeys() []int
 	// GetScheduledJob returns the scheduled job with the specified key.

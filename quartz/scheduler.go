@@ -29,7 +29,7 @@ type Scheduler interface {
 	IsStarted() bool
 
 	// ScheduleJob schedules a job using a specified trigger.
-	ScheduleJob(job Job, trigger Trigger) error
+	ScheduleJob(ctx context.Context, job Job, trigger Trigger) error
 
 	// GetJobKeys returns the keys of all of the scheduled jobs.
 	GetJobKeys() []int
@@ -56,9 +56,9 @@ type Scheduler interface {
 // StdScheduler implements the quartz.Scheduler interface.
 type StdScheduler struct {
 	mtx       sync.Mutex
+	wg        *sync.WaitGroup
 	queue     *priorityQueue
 	interrupt chan struct{}
-	signal    chan struct{}
 	cancel    context.CancelFunc
 	feeder    chan *item
 	dispatch  chan *item
@@ -94,17 +94,16 @@ func NewStdScheduler() Scheduler {
 func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
 	return &StdScheduler{
 		queue:     &priorityQueue{},
+		wg:        &sync.WaitGroup{},
 		interrupt: make(chan struct{}, 1),
-		cancel:    func() {},
 		feeder:    make(chan *item),
-		signal:    make(chan struct{}),
 		dispatch:  make(chan *item),
 		opts:      opts,
 	}
 }
 
 // ScheduleJob schedules a Job using a specified Trigger.
-func (sched *StdScheduler) ScheduleJob(job Job, trigger Trigger) error {
+func (sched *StdScheduler) ScheduleJob(ctx context.Context, job Job, trigger Trigger) error {
 	nextRunTime, err := trigger.NextFireTime(NowNano())
 	if err != nil {
 		return err
@@ -118,8 +117,8 @@ func (sched *StdScheduler) ScheduleJob(job Job, trigger Trigger) error {
 		index:    0,
 	}:
 		return nil
-	case <-sched.signal:
-		return context.Canceled
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
@@ -135,23 +134,26 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 	ctx, sched.cancel = context.WithCancel(ctx)
 	go func() { <-ctx.Done(); sched.Stop() }()
 	// start the feed reader
+	sched.wg.Add(1)
 	go sched.startFeedReader(ctx)
 
 	// start scheduler execution loop
+	sched.wg.Add(1)
 	go sched.startExecutionLoop(ctx)
 
 	// starts worker pool when WorkerLimit is > 0
 	sched.startWorkers(ctx)
 
 	sched.started = true
-	sched.signal = make(chan struct{})
 }
 
 // Wait blocks until the scheduler shuts down.
 func (sched *StdScheduler) Wait(ctx context.Context) {
+	sig := make(chan struct{})
+	go func() { defer close(sig); sched.wg.Wait() }()
 	select {
 	case <-ctx.Done():
-	case <-sched.signal:
+	case <-sig:
 	}
 }
 
@@ -227,11 +229,10 @@ func (sched *StdScheduler) Stop() {
 	log.Printf("Closing the StdScheduler.")
 	sched.cancel()
 	sched.started = false
-	close(sched.signal)
 }
 
 func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
-
+	defer sched.wg.Done()
 	for {
 		if sched.queueLen() == 0 {
 			select {
@@ -261,7 +262,9 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 func (sched *StdScheduler) startWorkers(ctx context.Context) {
 	if sched.opts.WorkerLimit > 0 {
 		for i := 0; i < sched.opts.WorkerLimit; i++ {
+			sched.wg.Add(1)
 			go func() {
+				defer sched.wg.Done()
 				for {
 					select {
 					case <-ctx.Done():
@@ -320,7 +323,11 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 				return
 			}
 		default:
-			go it.Job.Execute(ctx)
+			sched.wg.Add(1)
+			go func() {
+				defer sched.wg.Done()
+				it.Job.Execute(ctx)
+			}()
 		}
 	}
 
@@ -338,6 +345,7 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 }
 
 func (sched *StdScheduler) startFeedReader(ctx context.Context) {
+	defer sched.wg.Done()
 	for {
 		select {
 		case item := <-sched.feeder:
