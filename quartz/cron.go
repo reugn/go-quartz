@@ -354,7 +354,7 @@ func parseStepField(field string, min int, max int, translate []string) (*cronFi
 
 	from := normalize(t[0], translate)
 	step := atoi(t[1])
-	if !inScope(from, min, max) {
+	if !inScope(from, min, max) || step == 0 {
 		return nil, cronError("Cron step min/max validation error")
 	}
 
