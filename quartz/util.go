@@ -40,8 +40,8 @@ func fillRange(from, to int) ([]int, error) {
 		return nil, cronError("fillRange")
 	}
 
-	len := (to - from) + 1
-	arr := make([]int, len)
+	length := (to - from) + 1
+	arr := make([]int, length)
 
 	for i, j := from, 0; i <= to; i, j = i+1, j+1 {
 		arr[j] = i
@@ -55,8 +55,8 @@ func fillStep(from, step, max int) ([]int, error) {
 		return nil, cronError("fillStep")
 	}
 
-	len := ((max - from) / step) + 1
-	arr := make([]int, len)
+	length := ((max - from) / step) + 1
+	arr := make([]int, length)
 
 	for i, j := from, 0; i <= max; i, j = i+step, j+1 {
 		arr[j] = i
