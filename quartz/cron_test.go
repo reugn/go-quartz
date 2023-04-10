@@ -227,3 +227,17 @@ func iterate(prev int64, cronTrigger *quartz.CronTrigger, iterations int) (strin
 	}
 	return time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout), nil
 }
+
+func TestCronExpressionError(t *testing.T) {
+	tests := []string{
+		"*/X * * * * *",
+	}
+	for _, test := range tests {
+		t.Run(test, func(t *testing.T) {
+			_, err := quartz.NewCronTrigger(test)
+			if err == nil {
+				t.Error("expected error")
+			}
+		})
+	}
+}

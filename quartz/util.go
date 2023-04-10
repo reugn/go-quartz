@@ -51,7 +51,7 @@ func fillRange(from, to int) ([]int, error) {
 }
 
 func fillStep(from, step, max int) ([]int, error) {
-	if max < from {
+	if max < from || step == 0 {
 		return nil, cronError("fillStep")
 	}
 
