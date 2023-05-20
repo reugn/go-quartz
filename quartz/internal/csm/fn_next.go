@@ -31,6 +31,7 @@ func (csm *CronStateMachine) next() {
 		}
 	}
 }
+
 func (csm *CronStateMachine) isValidDate() bool {
 	return csm.day.Value() <= csm.day.max()
 }

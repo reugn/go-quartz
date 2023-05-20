@@ -66,6 +66,7 @@ func (n *CommonNode) nextInRange() bool {
 	n.value = n.values[0]
 	return true
 }
+
 func (n *CommonNode) isValid() bool {
 	withinLimits := n.value >= n.min && n.value <= n.max
 	if n.hasRange() {

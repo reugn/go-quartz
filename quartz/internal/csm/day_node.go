@@ -18,6 +18,7 @@ func NewMonthdayNode(value, min, max int, dayOfMonthValues []int, month, year cs
 func NewWeekdayNode(value, min, max int, dayOfWeekValues []int, month, year csmNode) *DayNode {
 	return &DayNode{CommonNode{value, min, max, make([]int, 0)}, dayOfWeekValues, &month, &year}
 }
+
 func (n *DayNode) Value() int {
 	return n.c.Value()
 }

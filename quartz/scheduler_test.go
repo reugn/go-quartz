@@ -163,6 +163,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 	}
 
 }
+
 func TestSchedulerCancel(t *testing.T) {
 	hourJob := func(ctx context.Context) (bool, error) {
 		timer := time.NewTimer(time.Hour)
