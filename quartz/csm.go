@@ -22,6 +22,3 @@ func makeCSMFromFields(prev time.Time, fields []*cronField) *CSM.CronStateMachin
 	csm := CSM.NewCronStateMachine(second, minute, hour, day, month, year)
 	return csm
 }
-func makeCSMFromCronTrigger(prev time.Time, trigger *CronTrigger) *CSM.CronStateMachine {
-	return makeCSMFromFields(prev, trigger.fields)
-}
