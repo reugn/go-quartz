@@ -27,15 +27,7 @@ func NewCronStateMachine(second, minute, hour csmNode, day *DayNode, month, year
 }
 
 func (csm *CronStateMachine) Value() time.Time {
-	return time.Date(
-		csm.year.Value(),
-		time.Month(csm.month.Value()),
-		csm.day.Value(),
-		csm.hour.Value(),
-		csm.minute.Value(),
-		csm.second.Value(),
-		0, time.UTC,
-	)
+	return csm.ValueWithLocation(time.UTC)
 }
 
 func (csm *CronStateMachine) ValueWithLocation(loc *time.Location) time.Time {
