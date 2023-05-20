@@ -1,4 +1,4 @@
-package CSM
+package csm
 
 // Retruns true is the element is included in the slice.
 func contained[T comparable](element T, slice []T) bool {

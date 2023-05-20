@@ -1,4 +1,4 @@
-package CSM
+package csm
 
 func (csm *CronStateMachine) next() {
 	if !csm.second.Next() {

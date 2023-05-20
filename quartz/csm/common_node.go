@@ -1,4 +1,4 @@
-package CSM
+package csm
 
 var _ csmNode = (*CommonNode)(nil)
 
@@ -25,18 +25,17 @@ func (n *CommonNode) Reset() {
 func (n *CommonNode) Next() (overflowed bool) {
 	if n.hasRange() {
 		return n.nextInRange()
-	} else {
-		return n.next()
 	}
+
+	return n.next()
 }
 
-func (n *CommonNode) FindForward() result {
+func (n *CommonNode) findForward() result {
 	if !n.isValid() {
 		if n.Next() {
 			return overflowed
-		} else {
-			return advanced
 		}
+		return advanced
 	}
 	return unchanged
 }
@@ -68,7 +67,7 @@ func (n *CommonNode) nextInRange() bool {
 	return true
 }
 func (n *CommonNode) isValid() bool {
-	var withinLimits bool = n.value >= n.min && n.value <= n.max
+	withinLimits := n.value >= n.min && n.value <= n.max
 	if n.hasRange() {
 		withinLimits = withinLimits && contained(n.value, n.values)
 	}

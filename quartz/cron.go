@@ -126,9 +126,8 @@ func (cf *cronField) String() string {
 }
 
 var (
-	months      = []string{"0", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
-	days        = []string{"0", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"}
-	daysInMonth = []int{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	months = []string{"0", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"}
+	days   = []string{"0", "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"}
 
 	// the pre-defined cron expressions
 	special = map[string]string{
@@ -138,9 +137,6 @@ var (
 		"@daily":   "0 0 0 * * *",
 		"@hourly":  "0 0 * * * *",
 	}
-
-	readDateLayout  = "Mon Jan 2 15:04:05 2006"
-	writeDateLayout = "Jan 2 15:04:05 2006"
 )
 
 // <second> <minute> <hour> <day-of-month> <month> <day-of-week> <year>

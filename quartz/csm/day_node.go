@@ -1,4 +1,4 @@
-package CSM
+package csm
 
 import "time"
 
@@ -24,15 +24,14 @@ func (n *DayNode) Value() int {
 
 func (n *DayNode) Reset() {
 	n.c.value = n.c.min
-	n.FindForward()
+	n.findForward()
 }
 
 func (n *DayNode) Next() (overflowed bool) {
 	if n.isWeekday() {
 		return n.nextWeekday()
-	} else {
-		return n.nextDay()
 	}
+	return n.nextDay()
 }
 
 func (n *DayNode) nextWeekday() (overflowed bool) {
@@ -55,13 +54,12 @@ func (n *DayNode) nextDay() (overflowed bool) {
 	return n.c.Next()
 }
 
-func (n *DayNode) FindForward() result {
+func (n *DayNode) findForward() result {
 	if !n.isValid() {
 		if n.Next() {
 			return overflowed
-		} else {
-			return advanced
 		}
+		return advanced
 	}
 	return unchanged
 }

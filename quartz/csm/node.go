@@ -1,4 +1,4 @@
-package CSM
+package csm
 
 type csmNode interface {
 	// Returns the value held by the node.
@@ -14,7 +14,7 @@ type csmNode interface {
 	// Check is the current node value is valid.
 	// If it is not valid, find the next valid value.
 	// Returns true if the value changed and false otherwise.
-	FindForward() result
+	findForward() result
 }
 
 type result int

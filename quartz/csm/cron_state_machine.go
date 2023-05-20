@@ -1,4 +1,4 @@
-package CSM
+package csm
 
 import "time"
 

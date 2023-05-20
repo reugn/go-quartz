@@ -1,14 +1,14 @@
-package CSM
+package csm
 
 func (csm *CronStateMachine) findForward() {
-	// Inital find, checking from most to least significant
+	// Initial find, checking from most to least significant
 	nodes := []NodeID{years, months, days, hours, minutes, seconds}
-	for _, nodeId := range nodes {
-		node := csm.selectNode(nodeId)
-		if ffresult := node.FindForward(); ffresult != unchanged {
-			csm.resetFrom(nodeId - 1)
+	for _, nodeID := range nodes {
+		node := csm.selectNode(nodeID)
+		if ffresult := node.findForward(); ffresult != unchanged {
+			csm.resetFrom(nodeID - 1)
 			if ffresult == overflowed {
-				csm.overflowFrom(nodeId + 1)
+				csm.overflowFrom(nodeID + 1)
 			}
 			return
 		}
