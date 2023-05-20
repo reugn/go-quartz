@@ -321,7 +321,7 @@ func parseStepField(field string, min int, max int, translate []string) (*cronFi
 
 func (parser *cronExpressionParser) nextTime(prev time.Time, fields []*cronField) (nextTime int64, err error) {
 	// Build CronStateMachine and run once
-	csm := MakeCSMFromFields(prev, fields)
+	csm := makeCSMFromFields(prev, fields)
 	nextDateTime := csm.NextTriggerTime(prev.Location())
 	return nextDateTime.UnixNano(), nil
 }

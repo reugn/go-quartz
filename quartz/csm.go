@@ -3,10 +3,10 @@ package quartz
 import (
 	"time"
 
-	CSM "github.com/reugn/go-quartz/quartz/csm"
+	CSM "github.com/reugn/go-quartz/quartz/internal/csm"
 )
 
-func MakeCSMFromFields(prev time.Time, fields []*cronField) *CSM.CronStateMachine {
+func makeCSMFromFields(prev time.Time, fields []*cronField) *CSM.CronStateMachine {
 	year := CSM.NewCommonNode(prev.Year(), 0, 999999, fields[6].values)
 	month := CSM.NewCommonNode(int(prev.Month()), 1, 12, fields[4].values)
 	var day *CSM.DayNode
@@ -22,6 +22,6 @@ func MakeCSMFromFields(prev time.Time, fields []*cronField) *CSM.CronStateMachin
 	csm := CSM.NewCronStateMachine(second, minute, hour, day, month, year)
 	return csm
 }
-func MakeCSMFromCronTrigger(prev time.Time, trigger *CronTrigger) *CSM.CronStateMachine {
-	return MakeCSMFromFields(prev, trigger.fields)
+func makeCSMFromCronTrigger(prev time.Time, trigger *CronTrigger) *CSM.CronStateMachine {
+	return makeCSMFromFields(prev, trigger.fields)
 }
