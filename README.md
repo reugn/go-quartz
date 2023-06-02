@@ -80,7 +80,7 @@ Implemented Jobs
 | Day of month | YES       | 1-31            | , - * ? /                  |
 | Month        | YES       | 1-12 or JAN-DEC | , - * /                    |
 | Day of week  | YES       | 1-7 or SUN-SAT  | , - * ? /                  |
-| Year         | NO        | empty           | *                          |
+| Year         | NO        | empty, 1970-    | , - * /                    |
 
 ## Examples
 ```go
