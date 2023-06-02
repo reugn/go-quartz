@@ -161,9 +161,6 @@ func validateCronExpression(expression string) ([]*cronField, error) {
 	if (tokens[3] != "?" && tokens[3] != "*") && (tokens[5] != "?" && tokens[5] != "*") {
 		return nil, cronError("Day field was set twice")
 	}
-	if tokens[6] != "*" {
-		return nil, cronError("Year field is not supported, use asterisk") // TODO: support year field
-	}
 
 	return buildCronField(tokens)
 }
