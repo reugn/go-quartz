@@ -11,7 +11,7 @@ type csmNode interface {
 	// Returns true if the value overflowed and false otherwise.
 	Next() bool
 
-	// Check is the current node value is valid.
+	// Checks if the current node value is valid.
 	// If it is not valid, find the next valid value.
 	// Returns true if the value changed and false otherwise.
 	findForward() result
