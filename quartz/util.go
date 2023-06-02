@@ -86,24 +86,6 @@ func cronError(cause string) error {
 	return fmt.Errorf("invalid cron expression: %s", cause)
 }
 
-// alignDigit justifies single digit values.
-func alignDigit(next int) string {
-	if next < 10 {
-		return "0" + strconv.Itoa(next)
-	}
-
-	return strconv.Itoa(next)
-}
-
-func step(prev, next, max int) int {
-	diff := next - prev
-	if diff < 0 {
-		return diff + max
-	}
-
-	return diff
-}
-
 func intVal(target []string, search string) int {
 	uSearch := strings.ToUpper(search)
 	for i, v := range target {
@@ -119,27 +101,6 @@ func intVal(target []string, search string) int {
 func atoi(str string) int {
 	i, _ := strconv.Atoi(str)
 	return i
-}
-
-func maxDays(month, year int) int {
-	if month == 2 && isLeapYear(year) {
-		return 29
-	}
-
-	return daysInMonth[month]
-}
-
-// isLeapYear determines if the given year is a leap year.
-// nolint:gocritic
-func isLeapYear(year int) bool {
-	if year%4 != 0 {
-		return false
-	} else if year%100 != 0 {
-		return true
-	} else if year%400 != 0 {
-		return false
-	}
-	return true
 }
 
 // NowNano returns the current UTC Unix time in nanoseconds.
