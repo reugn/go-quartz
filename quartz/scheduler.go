@@ -333,7 +333,8 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 		it = heap.Pop(sched.queue).(*item)
 	}()
 
-	// if there isn't actually a job ready to run now, we'll sleep again
+	// if there isn't actually a job ready to run now, we'll
+	// return early and try again.
 	if it == nil {
 		return
 	}
@@ -396,12 +397,4 @@ func (sched *StdScheduler) reset(ctx context.Context, next time.Time) {
 	case <-ctx.Done():
 	default:
 	}
-}
-
-func parkTime(ts int64) int64 {
-	now := NowNano()
-	if ts > now {
-		return ts - now
-	}
-	return 0
 }
