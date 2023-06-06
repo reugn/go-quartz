@@ -109,7 +109,7 @@ func NowNano() int64 {
 }
 
 func isOutdated(_time int64) bool {
-	return _time < NowNano()-(time.Second*30).Nanoseconds()
+	return _time < NowNano()-(10*time.Millisecond).Nanoseconds()
 }
 
 // HashCode calculates and returns a hash code for the given string.
