@@ -58,7 +58,7 @@ type StdScheduler struct {
 	mtx       sync.Mutex
 	wg        *sync.WaitGroup
 	queue     *priorityQueue
-	interrupt chan struct{}
+	interrupt chan time.Time
 	cancel    context.CancelFunc
 	feeder    chan *item
 	dispatch  chan *item
@@ -95,7 +95,7 @@ func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
 	return &StdScheduler{
 		queue:     &priorityQueue{},
 		wg:        &sync.WaitGroup{},
-		interrupt: make(chan struct{}, 1),
+		interrupt: make(chan time.Time, 1),
 		feeder:    make(chan *item),
 		dispatch:  make(chan *item),
 		opts:      opts,
@@ -233,30 +233,49 @@ func (sched *StdScheduler) Stop() {
 
 func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 	defer sched.wg.Done()
+
+	t := time.NewTimer(0)
+	defer t.Stop()
+
 	for {
 		if sched.queueLen() == 0 {
 			select {
-			case <-sched.interrupt:
+			case nextJobAt := <-sched.interrupt:
+				safeSetTimer(t, nextJobAt)
 			case <-ctx.Done():
 				log.Printf("Exit the empty execution loop.")
 				return
 			}
 		} else {
-			t := time.NewTimer(sched.calculateNextTick())
 			select {
 			case <-t.C:
 				sched.executeAndReschedule(ctx)
-
-			case <-sched.interrupt:
-				t.Stop()
-
+				safeSetTimer(t, sched.calculateNextTick())
+			case nextJobAt := <-sched.interrupt:
+				safeSetTimer(t, nextJobAt)
 			case <-ctx.Done():
 				log.Printf("Exit the execution loop.")
-				t.Stop()
 				return
 			}
 		}
 	}
+}
+
+func safeSetTimer(timer *time.Timer, next time.Time) {
+	// reset/stop the timer
+	if !timer.Stop() {
+		// drain if needed
+		<-timer.C
+	}
+
+	// if the "next" time is in the future, we reset the timer to
+	// this point.
+	if wait := time.Until(next); wait >= 0 {
+		timer.Reset(wait)
+		return
+	}
+
+	timer.Reset(0)
 }
 
 func (sched *StdScheduler) startWorkers(ctx context.Context) {
@@ -285,31 +304,39 @@ func (sched *StdScheduler) queueLen() int {
 	return sched.queue.Len()
 }
 
-func (sched *StdScheduler) calculateNextTick() time.Duration {
-	var interval int64
-
+func (sched *StdScheduler) calculateNextTick() time.Time {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 	if sched.queue.Len() > 0 {
-		interval = parkTime(sched.queue.Head().priority)
+		return time.Unix(0, sched.queue.Head().priority)
 	}
 
-	return time.Duration(interval)
+	return time.Now()
 }
 
 func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
-	// return if the job queue is empty
-	if sched.queueLen() == 0 {
-		return
-	}
-
 	// fetch an item
 	var it *item
 	func() {
 		sched.mtx.Lock()
 		defer sched.mtx.Unlock()
+		if sched.queue.Len() == 0 {
+			// return if the job queue is empty
+			return
+		}
+
+		next := time.Unix(0, sched.queue.Head().priority)
+		if time.Until(next) > 0 {
+			// return early
+			return
+		}
 		it = heap.Pop(sched.queue).(*item)
 	}()
+
+	// if there isn't actually a job ready to run now, we'll sleep again
+	if it == nil {
+		return
+	}
 
 	// execute the Job
 	if !isOutdated(it.priority) {
@@ -354,7 +381,7 @@ func (sched *StdScheduler) startFeedReader(ctx context.Context) {
 				defer sched.mtx.Unlock()
 
 				heap.Push(sched.queue, item)
-				sched.reset(ctx)
+				sched.reset(ctx, time.Unix(0, sched.queue.Head().priority))
 			}()
 		case <-ctx.Done():
 			log.Printf("Exit the feed reader.")
@@ -363,9 +390,9 @@ func (sched *StdScheduler) startFeedReader(ctx context.Context) {
 	}
 }
 
-func (sched *StdScheduler) reset(ctx context.Context) {
+func (sched *StdScheduler) reset(ctx context.Context, next time.Time) {
 	select {
-	case sched.interrupt <- struct{}{}:
+	case sched.interrupt <- next:
 	case <-ctx.Done():
 	default:
 	}
