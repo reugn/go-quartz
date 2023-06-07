@@ -96,23 +96,27 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 					defer timer.Stop()
 					select {
 					case <-timer.C:
+						t.Error("should never reach this")
 						return false, nil
 					case <-ctx.Done():
 						return true, nil
 					}
 				}),
-				quartz.NewSimpleTrigger(time.Millisecond))
+				quartz.NewSimpleTrigger(time.Millisecond),
+			)
 
 			ticker := time.NewTicker(4 * time.Millisecond)
+			defer ticker.Stop()
 			<-ticker.C
 			if atomic.LoadInt64(&n) == 0 {
 				t.Error("job should have run at least once")
 			}
 
+			const attempts = 100
 			switch tt {
 			case "Blocking":
 			BLOCKING:
-				for iters := 0; iters < 100; iters++ {
+				for iters := 0; iters < attempts; iters++ {
 					iters++
 					select {
 					case <-ctx.Done():
@@ -127,23 +131,29 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 			case "NonBlocking":
 				var lastN int64
 			NONBLOCKING:
-				for iters := 0; iters < 100; iters++ {
+				for iters := 0; iters < attempts; iters++ {
 					select {
 					case <-ctx.Done():
 						break NONBLOCKING
 					case <-ticker.C:
 						num := atomic.LoadInt64(&n)
-						if num <= lastN {
-							t.Errorf("on iter %d n did not increase %d",
-								iters, num,
-							)
+						if num > lastN {
+							break NONBLOCKING
 						}
+
 						lastN = num
 					}
 				}
+				num := atomic.LoadInt64(&n)
+				if num <= lastN {
+					t.Errorf("on iter %d n did not increase %d",
+						attempts, num,
+					)
+				}
+
 			case "WorkerSmall", "WorkerLarge":
 			WORKERS:
-				for iters := 0; iters < 100; iters++ {
+				for iters := 0; iters < attempts; iters++ {
 					select {
 					case <-ctx.Done():
 						break WORKERS

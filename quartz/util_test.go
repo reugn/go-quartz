@@ -8,12 +8,14 @@ import (
 )
 
 func assertEqual[T any](t *testing.T, a T, b T) {
+	t.Helper()
 	if !reflect.DeepEqual(a, b) {
 		t.Fatalf("%v != %v", a, b)
 	}
 }
 
 func assertNotEqual[T any](t *testing.T, a T, b T) {
+	t.Helper()
 	if reflect.DeepEqual(a, b) {
 		t.Fatalf("%v == %v", a, b)
 	}

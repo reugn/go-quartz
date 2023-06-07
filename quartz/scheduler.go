@@ -246,17 +246,17 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 				log.Printf("Exit the empty execution loop.")
 				return
 			}
-		} else {
-			select {
-			case <-t.C:
-				sched.executeAndReschedule(ctx)
-				safeSetTimer(t, sched.calculateNextTick())
-			case nextJobAt := <-sched.interrupt:
-				safeSetTimer(t, nextJobAt)
-			case <-ctx.Done():
-				log.Printf("Exit the execution loop.")
-				return
-			}
+			continue
+		}
+		select {
+		case <-t.C:
+			sched.executeAndReschedule(ctx)
+			safeSetTimer(t, sched.calculateNextTick())
+		case nextJobAt := <-sched.interrupt:
+			safeSetTimer(t, nextJobAt)
+		case <-ctx.Done():
+			log.Printf("Exit the execution loop.")
+			return
 		}
 	}
 }
@@ -265,7 +265,11 @@ func safeSetTimer(timer *time.Timer, next time.Time) {
 	// reset/stop the timer
 	if !timer.Stop() {
 		// drain if needed
-		<-timer.C
+		select {
+		case <-timer.C:
+		default:
+		}
+
 	}
 
 	// if the "next" time is in the future, we reset the timer to
@@ -307,6 +311,7 @@ func (sched *StdScheduler) queueLen() int {
 func (sched *StdScheduler) calculateNextTick() time.Time {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
+
 	if sched.queue.Len() > 0 {
 		return time.Unix(0, sched.queue.Head().priority)
 	}
@@ -325,9 +330,9 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 			return
 		}
 
-		next := time.Unix(0, sched.queue.Head().priority)
-		if time.Until(next) > 0 {
+		if next := time.Unix(0, sched.queue.Head().priority); time.Until(next) > 0 {
 			// return early
+			sched.reset(ctx, next)
 			return
 		}
 		it = heap.Pop(sched.queue).(*item)
@@ -363,6 +368,7 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	nextRunTime, err := it.Trigger.NextFireTime(it.priority)
 	if err != nil {
 		log.Printf("The Job '%s' got out the execution loop: %q", it.Job.Description(), err.Error())
+		sched.reset(ctx, time.Now().Add(-time.Millisecond))
 		return
 	}
 	it.priority = nextRunTime
