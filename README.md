@@ -96,6 +96,15 @@ Implemented Jobs
 - CurlJob
 - FunctionJob
 
+Logger interface. Any type that implements it can be used to log messages.
+```go
+type LoggerAdapter interface {
+	Log(msg string)
+}
+```
+Implemented LoggerAdapter
+- StdoutLogger
+
 ## Cron expression format
 
 | Field Name   | Mandatory | Allowed Values  | Allowed Special Characters |

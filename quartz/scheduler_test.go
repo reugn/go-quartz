@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -89,7 +90,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 
 			opts.OutdatedThreshold = 10 * time.Millisecond
 
-			sched := quartz.NewStdSchedulerWithOptions(opts)
+			sched := quartz.NewStdSchedulerWithOptions(opts, nil)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			sched.Start(ctx)
@@ -257,5 +258,23 @@ func TestSchedulerCancel(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestLogger(t *testing.T) {
+	ctx := context.Background()
+	logger := NewBufferedLogger()
+	sched := quartz.NewStdSchedulerWithOptions(quartz.StdSchedulerOptions{}, logger)
+	sched.Start(ctx)
+	sched.Stop()
+
+	content := logger.GetContents()
+
+	if len(content) == 0 {
+		t.Fatal("The log buffer is empty")
+	}
+
+	if !strings.Contains(content, "Closing the StdScheduler") {
+		t.Fatal(`The buffer not contains a string "Closing the StdScheduler""`)
 	}
 }

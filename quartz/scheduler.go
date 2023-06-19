@@ -4,7 +4,7 @@ import (
 	"container/heap"
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -64,6 +64,7 @@ type StdScheduler struct {
 	dispatch  chan *item
 	started   bool
 	opts      StdSchedulerOptions
+	logger    LoggerAdapter
 }
 
 type StdSchedulerOptions struct {
@@ -102,11 +103,15 @@ var _ Scheduler = (*StdScheduler)(nil)
 func NewStdScheduler() Scheduler {
 	return NewStdSchedulerWithOptions(StdSchedulerOptions{
 		OutdatedThreshold: 100 * time.Millisecond,
-	})
+	}, nil)
 }
 
 // NewStdSchedulerWithOptions returns a new StdScheduler configured as specified.
-func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
+func NewStdSchedulerWithOptions(opts StdSchedulerOptions, logger LoggerAdapter) *StdScheduler {
+	if nil == logger {
+		logger = &StdoutLogger{}
+	}
+
 	return &StdScheduler{
 		queue:     &priorityQueue{},
 		wg:        &sync.WaitGroup{},
@@ -114,6 +119,7 @@ func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
 		feeder:    make(chan *item),
 		dispatch:  make(chan *item),
 		opts:      opts,
+		logger:    logger,
 	}
 }
 
@@ -244,7 +250,7 @@ func (sched *StdScheduler) Stop() {
 		return
 	}
 
-	log.Printf("Closing the StdScheduler.")
+	sched.logger.Log("Closing the StdScheduler.")
 	sched.cancel()
 	sched.started = false
 }
@@ -256,7 +262,7 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 			select {
 			case <-sched.interrupt:
 			case <-ctx.Done():
-				log.Printf("Exit the empty execution loop.")
+				sched.logger.Log("Exit the empty execution loop.")
 				return
 			}
 		} else {
@@ -269,7 +275,7 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 				t.Stop()
 
 			case <-ctx.Done():
-				log.Printf("Exit the execution loop.")
+				sched.logger.Log("Exit the execution loop.")
 				t.Stop()
 				return
 			}
@@ -354,7 +360,7 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	// reschedule the Job
 	nextRunTime, err := it.Trigger.NextFireTime(it.priority)
 	if err != nil {
-		log.Printf("The Job '%s' got out the execution loop: %q", it.Job.Description(), err.Error())
+		sched.logger.Log(fmt.Sprintf("The Job '%s' got out the execution loop: %q", it.Job.Description(), err.Error()))
 		return
 	}
 	it.priority = nextRunTime
@@ -377,7 +383,7 @@ func (sched *StdScheduler) startFeedReader(ctx context.Context) {
 				sched.reset(ctx)
 			}()
 		case <-ctx.Done():
-			log.Printf("Exit the feed reader.")
+			sched.logger.Log("Exit the feed reader.")
 			return
 		}
 	}
