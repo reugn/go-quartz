@@ -68,7 +68,7 @@ type StdScheduler struct {
 
 type StdSchedulerOptions struct {
 	// When true, the scheduler will run jobs synchronously,
-	// waiting for each exceution instance of the job to return
+	// waiting for each execution instance of the job to return
 	// before starting the next execution. Running with this
 	// option effectively serializes all job execution.
 	BlockingExecution bool

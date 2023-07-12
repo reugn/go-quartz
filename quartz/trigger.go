@@ -60,7 +60,7 @@ func NewRunOnceTrigger(delay time.Duration) *RunOnceTrigger {
 }
 
 // NextFireTime returns the next time at which the RunOnceTrigger is scheduled to fire.
-// Sets exprired to true afterwards.
+// Sets expired to true afterwards.
 func (ot *RunOnceTrigger) NextFireTime(prev int64) (int64, error) {
 	if !ot.expired {
 		next := prev + ot.Delay.Nanoseconds()
