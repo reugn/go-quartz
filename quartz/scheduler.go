@@ -80,6 +80,15 @@ type StdSchedulerOptions struct {
 	// dispatched. If BlockingExecution is set, then WorkerLimit
 	// is ignored.
 	WorkerLimit int
+
+	// When the scheduler attempts to schedule a job, if the job
+	// is due to run in less than or equal to this value, then the
+	// scheduler will run the job, even if the "next scheduled
+	// job" is in the future. Historically, Go-Quartz had a
+	// scheduled time of 30 seconds, by default (NewStdScheduler)
+	// has a threshold of 100ms (if a job will be "triggered" in
+	// 100ms, then it is run now.)
+	OutdatedThreshold time.Duration
 }
 
 // Verify StdScheduler satisfies the Scheduler interface.
@@ -87,7 +96,9 @@ var _ Scheduler = (*StdScheduler)(nil)
 
 // NewStdScheduler returns a new StdScheduler with the default configuration.
 func NewStdScheduler() Scheduler {
-	return NewStdSchedulerWithOptions(StdSchedulerOptions{})
+	return NewStdSchedulerWithOptions(StdSchedulerOptions{
+		OutdatedThreshold: 100 * time.Millisecond,
+	})
 }
 
 // NewStdSchedulerWithOptions returns a new StdScheduler configured as specified.
@@ -305,14 +316,16 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 
 	// fetch an item
 	var it *item
+	var outdatedThreshould int64
 	func() {
 		sched.mtx.Lock()
 		defer sched.mtx.Unlock()
 		it = heap.Pop(sched.queue).(*item)
+		outdatedThreshould = sched.opts.OutdatedThreshold.Nanoseconds()
 	}()
 
 	// execute the Job
-	if !isOutdated(it.priority) {
+	if !isOutdated(it.priority, outdatedThreshould) {
 		switch {
 		case sched.opts.BlockingExecution:
 			it.Job.Execute(ctx)
