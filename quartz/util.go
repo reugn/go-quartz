@@ -108,8 +108,8 @@ func NowNano() int64 {
 	return time.Now().UTC().UnixNano()
 }
 
-func isOutdated(_time, threshhold int64) bool {
-	return _time < NowNano()-threshhold
+func isOutdated(_time, threshold int64) bool {
+	return _time < NowNano()-threshold
 }
 
 // HashCode calculates and returns a hash code for the given string.

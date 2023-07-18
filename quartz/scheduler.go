@@ -88,6 +88,10 @@ type StdSchedulerOptions struct {
 	// scheduled time of 30 seconds, by default (NewStdScheduler)
 	// has a threshold of 100ms (if a job will be "triggered" in
 	// 100ms, then it is run now.)
+	//
+	// As a rule of thumb, your OutdatedThreshold should always be
+	// greater than 0, but less than the shortest interval used by
+	// your job or jobs.
 	OutdatedThreshold time.Duration
 }
 
@@ -316,16 +320,16 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 
 	// fetch an item
 	var it *item
-	var outdatedThreshould int64
+	var outdatedThreshold int64
 	func() {
 		sched.mtx.Lock()
 		defer sched.mtx.Unlock()
 		it = heap.Pop(sched.queue).(*item)
-		outdatedThreshould = sched.opts.OutdatedThreshold.Nanoseconds()
+		outdatedThreshold = sched.opts.OutdatedThreshold.Nanoseconds()
 	}()
 
 	// execute the Job
-	if !isOutdated(it.priority, outdatedThreshould) {
+	if !isOutdated(it.priority, outdatedThreshold) {
 		switch {
 		case sched.opts.BlockingExecution:
 			it.Job.Execute(ctx)
