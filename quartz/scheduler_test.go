@@ -83,6 +83,8 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 				t.Fatal("unknown semantic:", tt)
 			}
 
+			opts.OutdatedThreshold = 10 * time.Millisecond
+
 			sched := quartz.NewStdSchedulerWithOptions(opts)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
@@ -101,9 +103,9 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 						return true, nil
 					}
 				}),
-				quartz.NewSimpleTrigger(time.Millisecond))
+				quartz.NewSimpleTrigger(20*time.Millisecond))
 
-			ticker := time.NewTicker(4 * time.Millisecond)
+			ticker := time.NewTicker(100 * time.Millisecond)
 			<-ticker.C
 			if atomic.LoadInt64(&n) == 0 {
 				t.Error("job should have run at least once")
