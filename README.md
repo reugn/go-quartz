@@ -99,5 +99,14 @@ sched.Wait(ctx)
 ```
 More code samples can be found in the examples directory.
 
+## Setting Custom Http Client
+
+```go
+client := &http.Client{Timeout: 5 * time.Second}
+
+// All CurlJob requests will now use this client
+quartz.SetHttpClient(client)
+```
+
 ## License
 Licensed under the MIT License.
