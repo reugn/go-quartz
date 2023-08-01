@@ -26,6 +26,9 @@ type Job interface {
 // JobStatus represents a Job status.
 type JobStatus int8
 
+// httpClient is the internal http.Client used by CurlJob to execute http requests
+var httpClient http.Client
+
 const (
 	// NA is the initial Job status.
 	NA JobStatus = iota
@@ -129,9 +132,14 @@ func (cu *CurlJob) Key() int {
 	return HashCode(cu.Description())
 }
 
+// SetHttpClient allows the http client to be set for all CurlJob requests
+func SetHttpClient(c *http.Client) {
+	httpClient = *c
+}
+
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (cu *CurlJob) Execute(ctx context.Context) {
-	client := &http.Client{}
+	client := httpClient
 	cu.request = cu.request.WithContext(ctx)
 	resp, err := client.Do(cu.request)
 	if err != nil {
