@@ -132,8 +132,8 @@ func (cu *CurlJob) Key() int {
 	return HashCode(cu.Description())
 }
 
-// SetHttpClient allows the http client to be set for all CurlJob requests
-func SetHttpClient(c *http.Client) {
+// SetHTTPClient allows the http client to be set for all CurlJob requests
+func SetHTTPClient(c *http.Client) {
 	httpClient = *c
 }
 

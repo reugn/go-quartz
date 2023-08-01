@@ -105,7 +105,7 @@ More code samples can be found in the examples directory.
 client := &http.Client{Timeout: 5 * time.Second}
 
 // All CurlJob requests will now use this client
-quartz.SetHttpClient(client)
+quartz.SetHTTPClient(client)
 ```
 
 ## License
