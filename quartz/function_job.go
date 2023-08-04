@@ -28,7 +28,7 @@ func NewFunctionJob[R any](function Function[R]) *FunctionJob[R] {
 	}
 }
 
-// NewFunctionJob returns a new FunctionJob with an explicit description.
+// NewFunctionJobWithDesc returns a new FunctionJob with an explicit description.
 func NewFunctionJobWithDesc[R any](desc string, function Function[R]) *FunctionJob[R] {
 	return &FunctionJob[R]{
 		function:  &function,

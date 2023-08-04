@@ -43,6 +43,22 @@ func TestFunctionJob(t *testing.T) {
 	assertEqual(t, n, 6)
 }
 
+func TestNewFunctionJobWithDescAndKey(t *testing.T) {
+	jobDesc := "test job"
+
+	funcJob1 := quartz.NewFunctionJobWithDesc(jobDesc, func(_ context.Context) (string, error) {
+		return "fired1", nil
+	})
+
+	funcJob2 := quartz.NewFunctionJobWithDesc(jobDesc, func(_ context.Context) (string, error) {
+		return "fired2", nil
+	})
+
+	assertEqual(t, funcJob1.Description(), jobDesc)
+	assertEqual(t, funcJob1.Key(), funcJob1.Key())
+	assertNotEqual(t, funcJob1.Key(), funcJob2.Key())
+}
+
 func TestFunctionJobRespectsContext(t *testing.T) {
 	var n int
 	funcJob2 := quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
