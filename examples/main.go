@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -71,7 +72,12 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 	}
 
 	shellJob := quartz.NewShellJob("ls -la")
-	curlJob, err := quartz.NewCurlJob(http.MethodGet, "http://worldclockapi.com/api/json/est/now", "", nil)
+	request, err := http.NewRequest(http.MethodGet, "https://worldtimeapi.org/api/timezone/utc", nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	curlJob, err := quartz.NewCurlJob(request)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -86,8 +92,14 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 
 	fmt.Println(sched.GetJobKeys())
 	fmt.Println(shellJob.Result)
-	fmt.Println(curlJob.Response)
-	fmt.Println(functionJob.Result)
+
+	responseBody, err := io.ReadAll(curlJob.Response.Body)
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Printf("%s\n%s\n", curlJob.Response.Status, string(responseBody))
+	}
+	fmt.Printf("Function job result: %v\n", *functionJob.Result)
 
 	time.Sleep(time.Second * 2)
 	sched.Stop()

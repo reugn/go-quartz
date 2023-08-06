@@ -1,12 +1,11 @@
 package quartz
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os/exec"
+	"strings"
 	"sync/atomic"
 )
 
@@ -80,77 +79,71 @@ func (sh *ShellJob) Execute(ctx context.Context) {
 // CurlJob represents a cURL command Job, implements the quartz.Job interface.
 // cURL is a command-line tool for getting or sending data including files using URL syntax.
 type CurlJob struct {
-	RequestMethod string
-	URL           string
-	Body          string
-	Headers       map[string]string
-	Response      string
-	StatusCode    int
-	JobStatus     JobStatus
-	request       *http.Request
+	httpClient  HTTPHandler
+	request     *http.Request
+	Response    *http.Response
+	JobStatus   JobStatus
+	description string
 }
 
-// NewCurlJob returns a new CurlJob.
-func NewCurlJob(
-	method string,
-	url string,
-	body string,
-	headers map[string]string,
-) (*CurlJob, error) {
-	_body := bytes.NewBuffer([]byte(body))
-	req, err := http.NewRequest(method, url, _body)
-	if err != nil {
-		return nil, err
-	}
+// HTTPHandler sends an HTTP request and returns an HTTP response,
+// following policy (such as redirects, cookies, auth) as configured
+// on the implementing HTTP client.
+type HTTPHandler interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
+// NewCurlJob returns a new CurlJob using the default HTTP client.
+func NewCurlJob(request *http.Request) (*CurlJob, error) {
+	return NewCurlJobWithHTTPClient(request, http.DefaultClient)
+}
 
+// NewCurlJobWithHTTPClient returns a new CurlJob using a custom HTTP client.
+func NewCurlJobWithHTTPClient(request *http.Request, httpClient HTTPHandler) (*CurlJob, error) {
 	return &CurlJob{
-		RequestMethod: method,
-		URL:           url,
-		Body:          body,
-		Headers:       headers,
-		Response:      "",
-		StatusCode:    -1,
-		JobStatus:     NA,
-		request:       req,
+		httpClient:  httpClient,
+		request:     request,
+		JobStatus:   NA,
+		description: formatRequest(request),
 	}, nil
 }
 
 // Description returns the description of the CurlJob.
 func (cu *CurlJob) Description() string {
-	return fmt.Sprintf("CurlJob: %s %s %s", cu.RequestMethod, cu.URL, cu.Body)
+	return fmt.Sprintf("CurlJob:\n%s", cu.description)
 }
 
 // Key returns the unique CurlJob key.
 func (cu *CurlJob) Key() int {
-	return HashCode(cu.Description())
+	return HashCode(cu.description)
+}
+
+func formatRequest(r *http.Request) string {
+	var request []string
+	url := fmt.Sprintf("%v %v %v", r.Method, r.URL, r.Proto)
+	request = append(request, url)
+	for name, headers := range r.Header {
+		for _, h := range headers {
+			request = append(request, fmt.Sprintf("%v: %v", name, h))
+		}
+	}
+	if r.ContentLength > 0 {
+		request = append(request, fmt.Sprintf("Content Length: %d", r.ContentLength))
+	}
+	return strings.Join(request, "\n")
 }
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (cu *CurlJob) Execute(ctx context.Context) {
-	client := &http.Client{}
 	cu.request = cu.request.WithContext(ctx)
-	resp, err := client.Do(cu.request)
-	if err != nil {
-		cu.JobStatus = FAILURE
-		cu.StatusCode = -1
-		cu.Response = err.Error()
-		return
-	}
+	var err error
+	cu.Response, err = cu.httpClient.Do(cu.request)
 
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+	if err == nil && cu.Response.StatusCode >= 200 && cu.Response.StatusCode < 400 {
 		cu.JobStatus = OK
 	} else {
 		cu.JobStatus = FAILURE
 	}
-
-	cu.StatusCode = resp.StatusCode
-	cu.Response = string(body)
 }
 
 type isolatedJob struct {
