@@ -13,7 +13,7 @@ Inspired by the [Quartz](https://github.com/quartz-scheduler/quartz) Java schedu
 
 ### Library building blocks
 
-Scheduler interface
+#### Scheduler interface
 
 ```go
 type Scheduler interface {
@@ -55,12 +55,13 @@ Implemented Schedulers
 
 - StdScheduler
 
-Trigger interface
+#### Trigger interface
 
 ```go
 type Trigger interface {
 	// NextFireTime returns the next time at which the Trigger is scheduled to fire.
 	NextFireTime(prev int64) (int64, error)
+
 	// Description returns the description of the Trigger.
 	Description() string
 }
@@ -72,13 +73,18 @@ Implemented Triggers
 - SimpleTrigger
 - RunOnceTrigger
 
-Job interface. Any type that implements it can be scheduled.
+#### Job interface
+
+Any type that implements it can be scheduled.
+
 ```go
 type Job interface {
 	// Execute is called by a Scheduler when the Trigger associated with this job fires.
 	Execute(context.Context)
+
 	// Description returns the description of the Job.
 	Description() string
+
 	// Key returns the unique key for the Job.
 	Key() int
 }
