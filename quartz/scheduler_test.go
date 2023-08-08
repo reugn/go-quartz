@@ -22,7 +22,9 @@ func TestScheduler(t *testing.T) {
 	shellJob.Description()
 	jobKeys[0] = shellJob.Key()
 
-	curlJob, err := quartz.NewCurlJob(http.MethodGet, "http://worldclockapi.com/api/json/est/now", "", nil)
+	request, err := http.NewRequest(http.MethodGet, "https://worldtimeapi.org/api/timezone/utc", nil)
+	assertEqual(t, err, nil)
+	curlJob, err := quartz.NewCurlJob(request)
 	assertEqual(t, err, nil)
 	curlJob.Description()
 	jobKeys[1] = curlJob.Key()
@@ -30,7 +32,9 @@ func TestScheduler(t *testing.T) {
 	errShellJob := quartz.NewShellJob("ls -z")
 	jobKeys[2] = errShellJob.Key()
 
-	errCurlJob, err := quartz.NewCurlJob(http.MethodGet, "http://", "", nil)
+	request, err = http.NewRequest(http.MethodGet, "http://", nil)
+	assertEqual(t, err, nil)
+	errCurlJob, err := quartz.NewCurlJob(request)
 	assertEqual(t, err, nil)
 	jobKeys[3] = errCurlJob.Key()
 
@@ -42,7 +46,7 @@ func TestScheduler(t *testing.T) {
 
 	time.Sleep(time.Second)
 	scheduledJobKeys := sched.GetJobKeys()
-	assertEqual(t, scheduledJobKeys, []int{3668896347, 328790344})
+	assertEqual(t, scheduledJobKeys, []int{3668896347, 2787962474})
 
 	_, err = sched.GetScheduledJob(jobKeys[0])
 	if err != nil {
@@ -56,12 +60,12 @@ func TestScheduler(t *testing.T) {
 
 	scheduledJobKeys = sched.GetJobKeys()
 	assertEqual(t, len(scheduledJobKeys), 1)
-	assertEqual(t, scheduledJobKeys, []int{328790344})
+	assertEqual(t, scheduledJobKeys, []int{2787962474})
 
 	sched.Clear()
 	sched.Stop()
 	assertEqual(t, shellJob.JobStatus, quartz.OK)
-	// assertEqual(t, curlJob.JobStatus, quartz.OK)
+	assertEqual(t, curlJob.JobStatus, quartz.OK)
 	assertEqual(t, errShellJob.JobStatus, quartz.FAILURE)
 	assertEqual(t, errCurlJob.JobStatus, quartz.FAILURE)
 }
