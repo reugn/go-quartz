@@ -76,6 +76,20 @@ func (sh *ShellJob) Execute(ctx context.Context) {
 	sh.Result = string(out)
 }
 
+var (
+	defaultClient = &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConnsPerHost: 10,  // std default 2.
+			MaxIdleConns:        200, // std default 100.
+		},
+	}
+)
+
+// SetHTTPClient set default http client.
+func SetHTTPClient(client *http.Client) {
+	defaultClient = client
+}
+
 // CurlJob represents a cURL command Job, implements the quartz.Job interface.
 // cURL is a command-line tool for getting or sending data including files using URL syntax.
 type CurlJob struct {
@@ -95,7 +109,7 @@ type HTTPHandler interface {
 
 // NewCurlJob returns a new CurlJob using the default HTTP client.
 func NewCurlJob(request *http.Request) (*CurlJob, error) {
-	return NewCurlJobWithHTTPClient(request, http.DefaultClient)
+	return NewCurlJobWithHTTPClient(request, defaultClient)
 }
 
 // NewCurlJobWithHTTPClient returns a new CurlJob using a custom HTTP client.
