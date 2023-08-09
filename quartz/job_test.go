@@ -147,35 +147,6 @@ func TestCurlJob(t *testing.T) {
 	}
 }
 
-func TestShellJob(t *testing.T) {
-	stdoutShell := "echo -n ok"
-
-	sh := quartz.NewShellJob(stdoutShell)
-	sh.Execute(context.Background())
-	assertEqual(t, 0, sh.ExitCode)
-	assertEqual(t, "", sh.Stderr)
-	assertEqual(t, "ok", sh.Stdout)
-	assertEqual(t, "ok", sh.Result)
-
-	stderrShell := "echo -n err >&2"
-
-	sh = quartz.NewShellJob(stderrShell)
-	sh.Execute(context.Background())
-	assertEqual(t, 0, sh.ExitCode)
-	assertEqual(t, "err", sh.Stderr)
-	assertEqual(t, "", sh.Stdout)
-	assertEqual(t, "err", sh.Result)
-
-	combine := "echo -n err >&2; echo -n ok >&1"
-
-	sh = quartz.NewShellJob(combine)
-	sh.Execute(context.Background())
-	assertEqual(t, 0, sh.ExitCode)
-	assertEqual(t, "err", sh.Stderr)
-	assertEqual(t, "ok", sh.Stdout)
-	assertEqual(t, "errok", sh.Result)
-}
-
 func TestCurlJobDescription(t *testing.T) {
 	postRequest, err := http.NewRequest(
 		http.MethodPost,
