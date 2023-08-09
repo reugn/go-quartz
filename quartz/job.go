@@ -1,11 +1,14 @@
 package quartz
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os/exec"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
@@ -41,6 +44,9 @@ const (
 type ShellJob struct {
 	Cmd       string
 	Result    string
+	ExitCode  int
+	Stdout    string
+	Stderr    string
 	JobStatus JobStatus
 }
 
@@ -63,9 +69,36 @@ func (sh *ShellJob) Key() int {
 	return HashCode(sh.Description())
 }
 
+var (
+	shellOnce = sync.Once{}
+	shellPath = "bash"
+)
+
+func (sh *ShellJob) getShell() string {
+	shellOnce.Do(func() {
+		_, err := exec.LookPath("/bin/bash")
+		// if not found bash binary, use `sh`.
+		if err != nil {
+			shellPath = "sh"
+		}
+	})
+	return shellPath
+}
+
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (sh *ShellJob) Execute(ctx context.Context) {
-	out, err := exec.CommandContext(ctx, "sh", "-c", sh.Cmd).Output()
+	shell := sh.getShell()
+
+	var stdout, stderr, result bytes.Buffer
+	cmd := exec.CommandContext(ctx, shell, "-c", sh.Cmd)
+	cmd.Stdout = io.MultiWriter(&result, &stdout)
+	cmd.Stderr = io.MultiWriter(&result, &stderr)
+
+	err := cmd.Run()
+	sh.Stdout = stdout.String()
+	sh.Stderr = stderr.String()
+	sh.ExitCode = cmd.ProcessState.ExitCode()
+
 	if err != nil {
 		sh.JobStatus = FAILURE
 		sh.Result = err.Error()
@@ -73,7 +106,7 @@ func (sh *ShellJob) Execute(ctx context.Context) {
 	}
 
 	sh.JobStatus = OK
-	sh.Result = string(out)
+	sh.Result = result.String()
 }
 
 // CurlJob represents a cURL command Job, implements the quartz.Job interface.

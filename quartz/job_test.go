@@ -147,6 +147,35 @@ func TestCurlJob(t *testing.T) {
 	}
 }
 
+func TestShellJob(t *testing.T) {
+	stdoutShell := "echo -n ok"
+
+	sh := quartz.NewShellJob(stdoutShell)
+	sh.Execute(context.Background())
+	assertEqual(t, 0, sh.ExitCode)
+	assertEqual(t, "", sh.Stderr)
+	assertEqual(t, "ok", sh.Stdout)
+	assertEqual(t, "ok", sh.Result)
+
+	stderrShell := "echo -n err >&2"
+
+	sh = quartz.NewShellJob(stderrShell)
+	sh.Execute(context.Background())
+	assertEqual(t, 0, sh.ExitCode)
+	assertEqual(t, "err", sh.Stderr)
+	assertEqual(t, "", sh.Stdout)
+	assertEqual(t, "err", sh.Result)
+
+	combine := "echo -n err >&2; echo -n ok >&1"
+
+	sh = quartz.NewShellJob(combine)
+	sh.Execute(context.Background())
+	assertEqual(t, 0, sh.ExitCode)
+	assertEqual(t, "err", sh.Stderr)
+	assertEqual(t, "ok", sh.Stdout)
+	assertEqual(t, "errok", sh.Result)
+}
+
 func TestCurlJobDescription(t *testing.T) {
 	postRequest, err := http.NewRequest(
 		http.MethodPost,
@@ -198,4 +227,68 @@ func TestCurlJobDescription(t *testing.T) {
 			assertEqual(t, httpJob.Description(), tt.expectedDescription)
 		})
 	}
+}
+
+func TestShellJob_Execute(t *testing.T) {
+	type args struct {
+		Cmd      string
+		ExitCode int
+		Result   string
+		Stdout   string
+		Stderr   string
+	}
+
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "test stdout",
+			args: args{
+				Cmd:      "echo -n ok",
+				Result:   "ok",
+				ExitCode: 0,
+				Stdout:   "ok",
+				Stderr:   "",
+			},
+		},
+		{
+			name: "test stderr",
+			args: args{
+				Cmd:      "echo -n err >&2",
+				Result:   "err",
+				ExitCode: 0,
+				Stdout:   "",
+				Stderr:   "err",
+			},
+		},
+		{
+			name: "test combine",
+			args: args{
+				Cmd:      "echo -n err >&2;echo -n ok >&1",
+				Result:   "errok",
+				ExitCode: 0,
+				Stdout:   "ok",
+				Stderr:   "err",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sh := quartz.NewShellJob(tt.args.Cmd)
+			sh.Execute(context.TODO())
+
+			assertEqual(t, tt.args.ExitCode, sh.ExitCode)
+			assertEqual(t, tt.args.Result, sh.Result)
+			assertEqual(t, tt.args.Stderr, sh.Stderr)
+			assertEqual(t, tt.args.Stdout, sh.Stdout)
+			assertEqual(t, tt.args.ExitCode, sh.ExitCode)
+		})
+	}
+
+	// invalid command
+	stdoutShell := "invliad_command"
+	sh := quartz.NewShellJob(stdoutShell)
+	sh.Execute(context.Background())
+	assertEqual(t, 127, sh.ExitCode)
 }
