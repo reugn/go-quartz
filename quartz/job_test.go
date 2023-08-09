@@ -291,4 +291,5 @@ func TestShellJob_Execute(t *testing.T) {
 	sh := quartz.NewShellJob(stdoutShell)
 	sh.Execute(context.Background())
 	assertEqual(t, 127, sh.ExitCode)
+	// the return value is different under different platforms.
 }
