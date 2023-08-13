@@ -91,8 +91,8 @@ func (sh *ShellJob) Execute(ctx context.Context) {
 
 	var stdout, stderr, result bytes.Buffer
 	cmd := exec.CommandContext(ctx, shell, "-c", sh.Cmd)
-	cmd.Stdout = io.MultiWriter(&result, &stdout)
-	cmd.Stderr = io.MultiWriter(&result, &stderr)
+	cmd.Stdout = io.MultiWriter(&stdout, &result)
+	cmd.Stderr = io.MultiWriter(&stderr, &result)
 
 	err := cmd.Run()
 	sh.Stdout = stdout.String()

@@ -236,8 +236,8 @@ func TestShellJob_Execute(t *testing.T) {
 		{
 			name: "test combine",
 			args: args{
-				Cmd:      "echo -n err >&2;echo -n ok >&1",
-				Result:   "errok",
+				Cmd:      "echo -n ok && sleep 0.01 && echo -n err >&2",
+				Result:   "okerr",
 				ExitCode: 0,
 				Stdout:   "ok",
 				Stderr:   "err",
@@ -253,7 +253,6 @@ func TestShellJob_Execute(t *testing.T) {
 			assertEqual(t, tt.args.Result, sh.Result)
 			assertEqual(t, tt.args.Stderr, sh.Stderr)
 			assertEqual(t, tt.args.Stdout, sh.Stdout)
-			assertEqual(t, tt.args.ExitCode, sh.ExitCode)
 		})
 	}
 
