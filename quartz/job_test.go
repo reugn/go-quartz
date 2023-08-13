@@ -258,7 +258,7 @@ func TestShellJob_Execute(t *testing.T) {
 	}
 
 	// invalid command
-	stdoutShell := "invliad_command"
+	stdoutShell := "invalid_command"
 	sh := quartz.NewShellJob(stdoutShell)
 	sh.Execute(context.Background())
 	assertEqual(t, 127, sh.ExitCode)
