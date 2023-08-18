@@ -174,6 +174,9 @@ func (sched *StdScheduler) Wait(ctx context.Context) {
 
 // IsStarted determines whether the scheduler has been started.
 func (sched *StdScheduler) IsStarted() bool {
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
+
 	return sched.started
 }
 
