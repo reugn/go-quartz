@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/reugn/go-quartz/quartz/logger"
 )
 
 // Job represents an interface to be implemented by structs which represent a 'job'
@@ -188,6 +190,7 @@ type isolatedJob struct {
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (j *isolatedJob) Execute(ctx context.Context) {
 	if wasRunning := j.isRunning.Swap(true); wasRunning != nil && wasRunning.(bool) {
+		logger.Debugf("Executed job %d is running.", j.Job.Key())
 		return
 	}
 	defer j.isRunning.Store(false)

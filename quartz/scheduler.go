@@ -4,9 +4,10 @@ import (
 	"container/heap"
 	"context"
 	"errors"
-	"log"
 	"sync"
 	"time"
+
+	"github.com/reugn/go-quartz/quartz/logger"
 )
 
 // ScheduledJob wraps a scheduled Job with its metadata.
@@ -143,6 +144,7 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 	defer sched.mtx.Unlock()
 
 	if sched.started {
+		logger.Info("Scheduler is already running.")
 		return
 	}
 
@@ -241,10 +243,11 @@ func (sched *StdScheduler) Stop() {
 	defer sched.mtx.Unlock()
 
 	if !sched.started {
+		logger.Info("Scheduler is not running.")
 		return
 	}
 
-	log.Printf("Closing the StdScheduler.")
+	logger.Info("Closing the StdScheduler.")
 	sched.cancel()
 	sched.started = false
 }
@@ -256,7 +259,7 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 			select {
 			case <-sched.interrupt:
 			case <-ctx.Done():
-				log.Printf("Exit the empty execution loop.")
+				logger.Info("Exit the empty execution loop.")
 				return
 			}
 		} else {
@@ -269,7 +272,7 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 				t.Stop()
 
 			case <-ctx.Done():
-				log.Printf("Exit the execution loop.")
+				logger.Info("Exit the execution loop.")
 				t.Stop()
 				return
 			}
@@ -279,6 +282,7 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 
 func (sched *StdScheduler) startWorkers(ctx context.Context) {
 	if sched.opts.WorkerLimit > 0 {
+		logger.Debugf("Starting %d scheduler workers.", sched.opts.WorkerLimit)
 		for i := 0; i < sched.opts.WorkerLimit; i++ {
 			sched.wg.Add(1)
 			go func() {
@@ -318,6 +322,7 @@ func (sched *StdScheduler) calculateNextTick() time.Duration {
 func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	// return if the job queue is empty
 	if sched.queueLen() == 0 {
+		logger.Debug("Job queue is empty.")
 		return
 	}
 
@@ -333,6 +338,7 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 
 	// execute the Job
 	if !isOutdated(it.priority, outdatedThreshold) {
+		logger.Debugf("Job %d is about to be executed.", it.Job.Key())
 		switch {
 		case sched.opts.BlockingExecution:
 			it.Job.Execute(ctx)
@@ -354,7 +360,7 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	// reschedule the Job
 	nextRunTime, err := it.Trigger.NextFireTime(it.priority)
 	if err != nil {
-		log.Printf("The Job '%s' got out the execution loop: %q", it.Job.Description(), err.Error())
+		logger.Infof("The Job '%s' got out the execution loop: %s.", it.Job.Description(), err)
 		return
 	}
 	it.priority = nextRunTime
@@ -377,7 +383,7 @@ func (sched *StdScheduler) startFeedReader(ctx context.Context) {
 				sched.reset(ctx)
 			}()
 		case <-ctx.Done():
-			log.Printf("Exit the feed reader.")
+			logger.Info("Exit the feed reader.")
 			return
 		}
 	}
