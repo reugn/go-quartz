@@ -46,6 +46,9 @@ func TestLoggerOff(t *testing.T) {
 	stdLogger := log.New(&b, "", log.LstdFlags)
 	logger.SetDefault(logger.NewSimpleLogger(stdLogger, logger.LevelOff))
 
+	if logger.Enabled(logger.LevelError) {
+		t.Fatal("LevelError is enabled")
+	}
 	logger.Error("Error")
 	assertEmpty(&b, t)
 	logger.Errorf("Error%s", "f")
@@ -59,11 +62,15 @@ func TestLogFormat(t *testing.T) {
 	logger.SetDefault(logr)
 
 	empty := struct{}{}
+	logr.Trace("Trace")
+	assertNotEmpty(&b, t)
 	logr.Tracef("Tracef: %s, %d, %v, %v", "a", 1, true, empty)
 	checkLogFormat(&b, t)
 	logger.Tracef("Tracef: %s, %d, %v, %v", "a", 1, true, empty)
 	checkLogFormat(&b, t)
 
+	logr.Debug("Debug")
+	assertNotEmpty(&b, t)
 	logr.Debugf("Debugf: %s, %d, %v, %v", "a", 1, true, empty)
 	checkLogFormat(&b, t)
 	logger.Debugf("Debugf: %s, %d, %v, %v", "a", 1, true, empty)
