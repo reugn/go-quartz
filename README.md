@@ -108,6 +108,19 @@ Implemented Jobs
 | Day of week  | YES       | 1-7 or SUN-SAT  | , - * ? /                  |
 | Year         | NO        | empty, 1970-    | , - * /                    |
 
+## Logger
+
+To set a custom logger, use the `logger.SetDefault` function.  
+The argument must implement the `logger.Logger` interface.
+
+The following example shows how to disable library logs.
+
+```go
+import "github.com/reugn/go-quartz/quartz/logger"
+
+logger.SetDefault(logger.NewSimpleLogger(nil, logger.LevelOff))
+```
+
 ## Examples
 
 ```go
