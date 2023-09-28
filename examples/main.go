@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,10 +28,115 @@ func main() {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
-	go sampleJobs(ctx, wg)
-	go sampleScheduler(ctx, wg)
+	//go sampleJobs(ctx, wg)
+	//go sampleScheduler(ctx, wg)
+
+	resultedShellJob1(ctx)
 
 	wg.Wait()
+}
+
+func resultedShellJob1(ctx context.Context) {
+	ch := make(chan quartz.JobResult)
+	cc := context.WithValue(ctx, "jobresult", ch)
+
+	sched := quartz.NewStdScheduler()
+	cronTrigger, err := quartz.NewCronTrigger("1/3 * * * * *")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	acquireFunc := func(path string) string {
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			fmt.Printf("read script error: %s \n", err.Error())
+		}
+
+		return string(data[:])
+	}
+	cronJob := quartz.NewResultedShellJob("/home/liy001/workspace/go-quartz/test-shell.sh", acquireFunc)
+
+	sched.Start(cc)
+
+	_ = sched.ScheduleJob(cc, cronJob, cronTrigger)
+
+	go func() {
+		scheduledJob, err := sched.GetScheduledJob(cronJob.Key())
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		fmt.Println(scheduledJob.TriggerDescription)
+		fmt.Println("Before delete: ", sched.GetJobKeys())
+
+		time.Sleep(time.Second * 30)
+		_ = sched.DeleteJob(cronJob.Key())
+		fmt.Println("After delete: ", sched.GetJobKeys())
+	}()
+
+	for {
+		select {
+		case jobResult := <-ch:
+			{
+				fmt.Printf("job result: %#v \n", jobResult)
+			}
+		}
+	}
+
+}
+
+func resultedShellJob(ctx context.Context) {
+	ch := make(chan JobResult)
+	cc := context.WithValue(ctx, "jobresult", ch)
+
+	sched := quartz.NewStdScheduler()
+	cronTrigger, err := quartz.NewCronTrigger("1/3 * * * * *")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	cronJob := ResultedShellJob{
+		ScriptPath: "/home/liy001/workspace/go-quartz/test-shell.sh",
+		AcquireFunc: func(path string) string {
+			data, err := ioutil.ReadFile(path)
+			if err != nil {
+				fmt.Printf("read script error: %s \n", err.Error())
+			}
+
+			return string(data[:])
+		},
+	}
+	sched.Start(cc)
+
+	_ = sched.ScheduleJob(cc, &cronJob, cronTrigger)
+
+	go func() {
+		scheduledJob, err := sched.GetScheduledJob(cronJob.Key())
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		fmt.Println(scheduledJob.TriggerDescription)
+		fmt.Println("Before delete: ", sched.GetJobKeys())
+
+		time.Sleep(time.Second * 10)
+		_ = sched.DeleteJob(cronJob.Key())
+		fmt.Println("After delete: ", sched.GetJobKeys())
+	}()
+
+	for {
+		select {
+		case jobResult := <-ch:
+			{
+				fmt.Printf("job result: %#v \n", jobResult)
+			}
+		}
+	}
+
 }
 
 func sampleScheduler(ctx context.Context, wg *sync.WaitGroup) {
