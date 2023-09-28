@@ -55,7 +55,7 @@ func resultedShellJob1(ctx context.Context) {
 
 		return string(data[:])
 	}
-	cronJob := quartz.NewResultedShellJob("/home/liy001/workspace/go-quartz/test-shell.sh", acquireFunc)
+	cronJob := quartz.NewResultedShellJob("../go-quartz/test-shell.sh", acquireFunc)
 
 	sched.Start(cc)
 
