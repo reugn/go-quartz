@@ -1,6 +1,7 @@
 package quartz
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -153,13 +154,13 @@ func validateCronExpression(expression string) ([]*cronField, error) {
 	}
 	length := len(tokens)
 	if length < 6 || length > 7 {
-		return nil, cronError("Invalid expression length")
+		return nil, cronError("invalid expression length")
 	}
 	if length == 6 {
 		tokens = append(tokens, "*")
 	}
 	if (tokens[3] != "?" && tokens[3] != "*") && (tokens[5] != "?" && tokens[5] != "*") {
-		return nil, cronError("Day field was set twice")
+		return nil, cronError("day field was set twice")
 	}
 
 	return buildCronField(tokens)
@@ -224,7 +225,7 @@ func parseField(field string, min int, max int, translate ...[]string) (*cronFie
 		if inScope(i, min, max) {
 			return &cronField{[]int{i}}, nil
 		}
-		return nil, cronError("Single min/max validation error")
+		return nil, cronError("single min/max validation error")
 	}
 
 	// list values
@@ -249,11 +250,11 @@ func parseField(field string, min int, max int, translate ...[]string) (*cronFie
 			if inScope(i, min, max) {
 				return &cronField{[]int{i}}, nil
 			}
-			return nil, cronError("Cron literal min/max validation error")
+			return nil, cronError("cron literal min/max validation error")
 		}
 	}
 
-	return nil, cronError("Cron parse error")
+	return nil, cronError("cron parse error")
 }
 
 func parseListField(field string, translate []string) (*cronField, error) {
@@ -274,13 +275,13 @@ func parseRangeField(field string, min int, max int, translate []string) (*cronF
 	var _range []int
 	t := strings.Split(field, "-")
 	if len(t) != 2 {
-		return nil, cronError("Parse cron range error")
+		return nil, cronError("parse cron range error")
 	}
 
 	from := normalize(t[0], translate)
 	to := normalize(t[1], translate)
 	if !inScope(from, min, max) || !inScope(to, min, max) {
-		return nil, cronError("Cron range min/max validation error")
+		return nil, cronError("cron range min/max validation error")
 	}
 
 	_range, err := fillRange(from, to)
@@ -295,7 +296,7 @@ func parseStepField(field string, min int, max int, translate []string) (*cronFi
 	var _step []int
 	t := strings.Split(field, "/")
 	if len(t) != 2 {
-		return nil, cronError("Parse cron step error")
+		return nil, cronError("parse cron step error")
 	}
 
 	if t[0] == "*" {
@@ -305,7 +306,7 @@ func parseStepField(field string, min int, max int, translate []string) (*cronFi
 	from := normalize(t[0], translate)
 	step := atoi(t[1])
 	if !inScope(from, min, max) {
-		return nil, cronError("Cron step min/max validation error")
+		return nil, cronError("cron step min/max validation error")
 	}
 
 	_step, err := fillStep(from, step, max)
@@ -316,9 +317,12 @@ func parseStepField(field string, min int, max int, translate []string) (*cronFi
 	return &cronField{_step}, nil
 }
 
-func (parser *cronExpressionParser) nextTime(prev time.Time, fields []*cronField) (nextTime int64, err error) {
+func (parser *cronExpressionParser) nextTime(prev time.Time, fields []*cronField) (int64, error) {
 	// Build CronStateMachine and run once
 	csm := makeCSMFromFields(prev, fields)
 	nextDateTime := csm.NextTriggerTime(prev.Location())
+	if nextDateTime.Before(prev) || nextDateTime.Equal(prev) {
+		return 0, errors.New("next trigger time is in the past")
+	}
 	return nextDateTime.UnixNano(), nil
 }
