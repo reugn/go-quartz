@@ -191,7 +191,7 @@ func TestCronExpressionExpired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prev, err = cronTrigger.NextFireTime(prev)
+	_, err = cronTrigger.NextFireTime(prev)
 	if err == nil {
 		t.Fatal("cron expression should be expired")
 	}
