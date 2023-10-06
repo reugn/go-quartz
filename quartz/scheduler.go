@@ -355,6 +355,8 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 				it.Job.Execute(ctx)
 			}()
 		}
+	} else {
+		logger.Debugf("Job %d skipped as outdated %d.", it.Job.Key(), it.priority)
 	}
 
 	// reschedule the Job

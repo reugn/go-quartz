@@ -184,6 +184,19 @@ func TestCronExpression14(t *testing.T) {
 	assertEqual(t, result, "Wed May 1 00:00:00 2041")
 }
 
+func TestCronExpressionExpired(t *testing.T) {
+	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
+	fmt.Println(time.Unix(0, prev).UTC())
+	cronTrigger, err := quartz.NewCronTrigger("0 0 0 1 1 ? 2023")
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev, err = cronTrigger.NextFireTime(prev)
+	if err == nil {
+		t.Fatal("cron expression should be expired")
+	}
+}
+
 func TestCronExpressionWithLoc(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
 	prev := time.Date(2023, 4, 29, 12, 00, 00, 00, loc).UnixNano()
