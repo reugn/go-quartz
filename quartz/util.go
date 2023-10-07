@@ -21,6 +21,19 @@ func indexes(search []string, target []string) ([]int, error) {
 	return searchIndexes, nil
 }
 
+func extractRangeValues(parsed []string) ([]string, []string) {
+	values := make([]string, 0, len(parsed))
+	rangeValues := make([]string, 0)
+	for _, v := range parsed {
+		if strings.Contains(v, "-") { // range value
+			rangeValues = append(rangeValues, v)
+		} else {
+			values = append(values, v)
+		}
+	}
+	return values, rangeValues
+}
+
 func sliceAtoi(sa []string) ([]int, error) {
 	si := make([]int, 0, len(sa))
 	for _, a := range sa {

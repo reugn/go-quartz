@@ -184,6 +184,32 @@ func TestCronExpression14(t *testing.T) {
 	assertEqual(t, result, "Wed May 1 00:00:00 2041")
 }
 
+func TestCronExpressionMixedRange(t *testing.T) {
+	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
+	fmt.Println(time.Unix(0, prev).UTC())
+	result := ""
+	cronTrigger, err := quartz.NewCronTrigger("0 0 0-2,5,7-9,21-22 * * *")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 10)
+	}
+	assertEqual(t, result, "Sun Apr 23 21:00:00 2023")
+}
+
+func TestCronExpressionMixedStringRange(t *testing.T) {
+	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
+	fmt.Println(time.Unix(0, prev).UTC())
+	result := ""
+	cronTrigger, err := quartz.NewCronTrigger("0 0 0 ? * SUN,TUE-WED,Fri-Sat")
+	if err != nil {
+		t.Fatal(err)
+	} else {
+		result, _ = iterate(prev, cronTrigger, 10)
+	}
+	assertEqual(t, result, "Sat May 6 00:00:00 2023")
+}
+
 func TestCronExpressionExpired(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
 	fmt.Println(time.Unix(0, prev).UTC())
