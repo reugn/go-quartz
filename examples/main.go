@@ -38,28 +38,24 @@ func main() {
 
 func resultedShellJob1(ctx context.Context) {
 	ch := make(chan quartz.JobResult)
-	cc := context.WithValue(ctx, "jobresult", ch)
+	ch2 := make(chan quartz.JobResult)
+
+	jobKey := "jobresult-123"
+	jobKey2 := "jobresult-321"
+	cc := context.WithValue(ctx, jobKey, ch)
 
 	sched := quartz.NewStdScheduler()
-	cronTrigger, err := quartz.NewCronTrigger("1/3 * * * * *")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 
-	acquireFunc := func(path string) string {
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			fmt.Printf("read script error: %s \n", err.Error())
-		}
-
-		return string(data[:])
-	}
-	cronJob := quartz.NewResultedShellJob("../go-quartz/test-shell.sh", acquireFunc)
+	spec1 := "1/3 * * * * *"
+	spec2 := "1/2 * * * * *"
+	cronTrigger, cronJob := createJob(jobKey, spec1)
+	cronTrigger2, cronJob2 := createJob(jobKey2, spec2)
 
 	sched.Start(cc)
-
 	_ = sched.ScheduleJob(cc, cronJob, cronTrigger)
+	cc2 := context.WithValue(cc, jobKey2, ch2)
+
+	_ = sched.ScheduleJob(cc2, cronJob2, cronTrigger2)
 
 	go func() {
 		scheduledJob, err := sched.GetScheduledJob(cronJob.Key())
@@ -87,8 +83,28 @@ func resultedShellJob1(ctx context.Context) {
 
 }
 
+func createJob(jobKey, cron string) (*quartz.CronTrigger, *quartz.ResultedShellJob) {
+	cronTrigger, err := quartz.NewCronTrigger(cron)
+	if err != nil {
+		fmt.Println(err)
+		return nil, nil
+	}
+
+	acquireFunc := func(path string) string {
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			fmt.Printf("read script error: %s \n", err.Error())
+		}
+
+		return string(data[:])
+	}
+	cronJob := quartz.NewResultedShellJob(jobKey, "../go-quartz/test-shell.sh", acquireFunc)
+
+	return cronTrigger, cronJob
+}
+
 func resultedShellJob(ctx context.Context) {
-	ch := make(chan JobResult)
+	ch := make(chan quartz.JobResult)
 	cc := context.WithValue(ctx, "jobresult", ch)
 
 	sched := quartz.NewStdScheduler()
@@ -98,7 +114,7 @@ func resultedShellJob(ctx context.Context) {
 		return
 	}
 
-	cronJob := ResultedShellJob{
+	cronJob := quartz.ResultedShellJob{
 		ScriptPath: "/home/liy001/workspace/go-quartz/test-shell.sh",
 		AcquireFunc: func(path string) string {
 			data, err := ioutil.ReadFile(path)

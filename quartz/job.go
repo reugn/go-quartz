@@ -14,6 +14,10 @@ import (
 	"github.com/reugn/go-quartz/quartz/logger"
 )
 
+type BaseJob struct {
+	JobKey string
+}
+
 // Job represents an interface to be implemented by structs which represent a 'job'
 // to be performed.
 type Job interface {
@@ -44,6 +48,7 @@ const (
 // ShellJob represents a shell command Job, implements the quartz.Job interface.
 // Be aware of runtime.GOOS when sending shell commands for execution.
 type ShellJob struct {
+	BaseJob
 	Cmd       string
 	Result    string
 	ExitCode  int
@@ -114,6 +119,7 @@ func (sh *ShellJob) Execute(ctx context.Context) {
 // CurlJob represents a cURL command Job, implements the quartz.Job interface.
 // cURL is a command-line tool for getting or sending data including files using URL syntax.
 type CurlJob struct {
+	BaseJob
 	httpClient  HTTPHandler
 	request     *http.Request
 	Response    *http.Response
@@ -208,6 +214,7 @@ func NewIsolatedJob(underlying Job) Job {
 }
 
 type JobResult struct {
+	JobKey string
 	Result string
 	Err    string
 	Code   int
@@ -215,6 +222,7 @@ type JobResult struct {
 
 // PrintJob implements the quartz.Job interface.
 type ResultedShellJob struct {
+	BaseJob
 	ScriptPath  string
 	AcquireFunc func(path string) string
 	Desc        string
@@ -233,7 +241,7 @@ func (rsj *ResultedShellJob) Description() string {
 
 // Key returns the unique PrintJob key.
 func (rsj *ResultedShellJob) Key() int {
-	return HashCode(rsj.Description())
+	return HashCode(rsj.JobKey)
 }
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
@@ -245,8 +253,9 @@ func (rsj *ResultedShellJob) Key() int {
 type AcquireFunc func(path string) string
 
 // NewShellJob returns a new ShellJob.
-func NewResultedShellJob(scriptPath string, acquireFunc AcquireFunc) *ResultedShellJob {
+func NewResultedShellJob(jobKey, scriptPath string, acquireFunc AcquireFunc) *ResultedShellJob {
 	return &ResultedShellJob{
+		BaseJob:     BaseJob{JobKey: jobKey},
 		ScriptPath:  scriptPath,
 		AcquireFunc: acquireFunc,
 		Result:      "",
@@ -281,7 +290,8 @@ func (rsj *ResultedShellJob) acquireScript() {
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (rsj *ResultedShellJob) Execute(ctx context.Context) {
-	ch := ctx.Value("jobresult").(chan JobResult)
+	t := ctx.Value(rsj.JobKey)
+	ch := t.(chan JobResult)
 
 	rsj.acquireScript()
 	shell := rsj.getShell()
@@ -297,6 +307,7 @@ func (rsj *ResultedShellJob) Execute(ctx context.Context) {
 	rsj.ExitCode = cmd.ProcessState.ExitCode()
 
 	jobResult := JobResult{
+		JobKey: rsj.JobKey,
 		Result: stdout.String(),
 		Err:    stderr.String(),
 		Code:   cmd.ProcessState.ExitCode(),
