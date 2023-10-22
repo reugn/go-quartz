@@ -119,30 +119,27 @@ func TestCurlJob(t *testing.T) {
 	tests := []struct {
 		name           string
 		request        *http.Request
-		client         quartz.HTTPHandler
+		opts           quartz.CurlJobOptions
 		expectedStatus quartz.JobStatus
 	}{
 		{
 			name:           "HTTP 200 OK",
 			request:        request,
-			client:         handlerOk,
+			opts:           quartz.CurlJobOptions{HTTPClient: handlerOk},
 			expectedStatus: quartz.OK,
 		},
 		{
 			name:           "HTTP 500 Internal Server Error",
 			request:        request,
-			client:         handlerErr,
+			opts:           quartz.CurlJobOptions{HTTPClient: handlerErr},
 			expectedStatus: quartz.FAILURE,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			httpJob, err := quartz.NewCurlJobWithHTTPClient(tt.request, tt.client)
-			if err != nil {
-				t.Error(err)
-			}
+			httpJob := quartz.NewCurlJobWithOptions(tt.request, tt.opts)
 			httpJob.Execute(context.Background())
-			assertEqual(t, httpJob.JobStatus, tt.expectedStatus)
+			assertEqual(t, httpJob.JobStatus(), tt.expectedStatus)
 		})
 	}
 }
@@ -191,11 +188,10 @@ func TestCurlJobDescription(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			httpJob, err := quartz.NewCurlJobWithHTTPClient(tt.request, http.DefaultClient)
-			if err != nil {
-				t.Error(err)
-			}
+			opts := quartz.CurlJobOptions{HTTPClient: http.DefaultClient}
+			httpJob := quartz.NewCurlJobWithOptions(tt.request, opts)
 			assertEqual(t, httpJob.Description(), tt.expectedDescription)
+			assertEqual(t, httpJob.Response(), nil)
 		})
 	}
 }
@@ -217,7 +213,6 @@ func TestShellJob_Execute(t *testing.T) {
 			name: "test stdout",
 			args: args{
 				Cmd:      "echo -n ok",
-				Result:   "ok",
 				ExitCode: 0,
 				Stdout:   "ok",
 				Stderr:   "",
@@ -227,7 +222,6 @@ func TestShellJob_Execute(t *testing.T) {
 			name: "test stderr",
 			args: args{
 				Cmd:      "echo -n err >&2",
-				Result:   "err",
 				ExitCode: 0,
 				Stdout:   "",
 				Stderr:   "err",
@@ -237,7 +231,6 @@ func TestShellJob_Execute(t *testing.T) {
 			name: "test combine",
 			args: args{
 				Cmd:      "echo -n ok && sleep 0.01 && echo -n err >&2",
-				Result:   "okerr",
 				ExitCode: 0,
 				Stdout:   "ok",
 				Stderr:   "err",
@@ -249,10 +242,9 @@ func TestShellJob_Execute(t *testing.T) {
 			sh := quartz.NewShellJob(tt.args.Cmd)
 			sh.Execute(context.TODO())
 
-			assertEqual(t, tt.args.ExitCode, sh.ExitCode)
-			assertEqual(t, tt.args.Result, sh.Result)
-			assertEqual(t, tt.args.Stderr, sh.Stderr)
-			assertEqual(t, tt.args.Stdout, sh.Stdout)
+			assertEqual(t, tt.args.ExitCode, sh.ExitCode())
+			assertEqual(t, tt.args.Stderr, sh.Stderr())
+			assertEqual(t, tt.args.Stdout, sh.Stdout())
 		})
 	}
 
@@ -260,6 +252,6 @@ func TestShellJob_Execute(t *testing.T) {
 	stdoutShell := "invalid_command"
 	sh := quartz.NewShellJob(stdoutShell)
 	sh.Execute(context.Background())
-	assertEqual(t, 127, sh.ExitCode)
+	assertEqual(t, 127, sh.ExitCode())
 	// the return value is different under different platforms.
 }

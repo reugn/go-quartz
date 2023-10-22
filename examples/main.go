@@ -87,11 +87,7 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 		fmt.Println(err)
 		return
 	}
-	curlJob, err := quartz.NewCurlJob(request)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	curlJob := quartz.NewCurlJob(request)
 	functionJob := quartz.NewFunctionJobWithDesc("42", func(_ context.Context) (int, error) { return 42, nil })
 
 	_ = sched.ScheduleJob(ctx, shellJob, cronTrigger)
@@ -101,15 +97,15 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 	time.Sleep(time.Second * 10)
 
 	fmt.Println(sched.GetJobKeys())
-	fmt.Println(shellJob.Result)
+	fmt.Println(shellJob.Stdout())
 
-	responseBody, err := io.ReadAll(curlJob.Response.Body)
+	responseBody, err := io.ReadAll(curlJob.Response().Body)
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Printf("%s\n%s\n", curlJob.Response.Status, string(responseBody))
+		fmt.Printf("%s\n%s\n", curlJob.Response().Status, string(responseBody))
 	}
-	fmt.Printf("Function job result: %v\n", *functionJob.Result)
+	fmt.Printf("Function job result: %v\n", *functionJob.Result())
 
 	time.Sleep(time.Second * 2)
 	sched.Stop()

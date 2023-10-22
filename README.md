@@ -149,7 +149,7 @@ func main() {
 	shellJob := quartz.NewShellJob("ls -la")
 
 	request, _ := http.NewRequest(http.MethodGet, "https://worldtimeapi.org/api/timezone/utc", nil)
-	curlJob, _ := quartz.NewCurlJob(request)
+	curlJob := quartz.NewCurlJob(request)
 
 	functionJob := quartz.NewFunctionJob(func(_ context.Context) (int, error) { return 42, nil })
 

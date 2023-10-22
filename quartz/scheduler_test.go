@@ -24,8 +24,7 @@ func TestScheduler(t *testing.T) {
 
 	request, err := http.NewRequest(http.MethodGet, "https://worldtimeapi.org/api/timezone/utc", nil)
 	assertEqual(t, err, nil)
-	curlJob, err := quartz.NewCurlJob(request)
-	assertEqual(t, err, nil)
+	curlJob := quartz.NewCurlJob(request)
 	curlJob.Description()
 	jobKeys[1] = curlJob.Key()
 
@@ -34,8 +33,7 @@ func TestScheduler(t *testing.T) {
 
 	request, err = http.NewRequest(http.MethodGet, "http://", nil)
 	assertEqual(t, err, nil)
-	errCurlJob, err := quartz.NewCurlJob(request)
-	assertEqual(t, err, nil)
+	errCurlJob := quartz.NewCurlJob(request)
 	jobKeys[3] = errCurlJob.Key()
 
 	sched.Start(ctx)
@@ -64,10 +62,10 @@ func TestScheduler(t *testing.T) {
 
 	sched.Clear()
 	sched.Stop()
-	assertEqual(t, shellJob.JobStatus, quartz.OK)
-	assertEqual(t, curlJob.JobStatus, quartz.OK)
-	assertEqual(t, errShellJob.JobStatus, quartz.FAILURE)
-	assertEqual(t, errCurlJob.JobStatus, quartz.FAILURE)
+	assertEqual(t, shellJob.JobStatus(), quartz.OK)
+	assertEqual(t, curlJob.JobStatus(), quartz.OK)
+	assertEqual(t, errShellJob.JobStatus(), quartz.FAILURE)
+	assertEqual(t, errCurlJob.JobStatus(), quartz.FAILURE)
 }
 
 func TestSchedulerBlockingSemantics(t *testing.T) {
