@@ -23,15 +23,11 @@ func (l *loggerValue) setLogger(new Logger) {
 	l.logger = new
 }
 
-var defaultLogger *loggerValue
-
-func init() {
-	defaultLogger = &loggerValue{
-		logger: NewSimpleLogger(
-			log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile),
-			LevelInfo,
-		),
-	}
+var defaultLogger = loggerValue{
+	logger: NewSimpleLogger(
+		log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile),
+		LevelInfo,
+	),
 }
 
 // Default returns the default Logger.
