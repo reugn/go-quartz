@@ -3,25 +3,41 @@ package logger
 import (
 	"log"
 	"os"
-	"sync/atomic"
+	"sync"
 )
 
-var defaultLogger atomic.Value
+type loggerValue struct {
+	sync.RWMutex
+	logger Logger
+}
 
-func init() {
-	defaultLogger.Store(NewSimpleLogger(
-		log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile), LevelInfo),
-	)
+func (l *loggerValue) getLogger() Logger {
+	l.RLock()
+	defer l.RUnlock()
+	return l.logger
+}
+
+func (l *loggerValue) setLogger(new Logger) {
+	l.Lock()
+	defer l.Unlock()
+	l.logger = new
+}
+
+var defaultLogger = loggerValue{
+	logger: NewSimpleLogger(
+		log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile),
+		LevelInfo,
+	),
 }
 
 // Default returns the default Logger.
 func Default() Logger {
-	return defaultLogger.Load().(Logger)
+	return defaultLogger.getLogger()
 }
 
 // SetDefault makes l the default Logger.
 func SetDefault(l Logger) {
-	defaultLogger.Store(l)
+	defaultLogger.setLogger(l)
 }
 
 // Trace logs at LevelTrace.
