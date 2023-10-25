@@ -14,10 +14,11 @@ import (
 	"github.com/reugn/go-quartz/quartz/logger"
 )
 
-// Job represents an interface to be implemented by structs which represent a 'job'
-// to be performed.
+// Job represents an interface to be implemented by structs which
+// represent a 'job' to be performed.
 type Job interface {
-	// Execute is called by a Scheduler when the Trigger associated with this job fires.
+	// Execute is called by a Scheduler when the Trigger associated
+	// with this job fires.
 	Execute(context.Context)
 
 	// Description returns the description of the Job.
@@ -44,7 +45,7 @@ const (
 // ShellJob represents a shell command Job, implements the quartz.Job interface.
 // Be aware of runtime.GOOS when sending shell commands for execution.
 type ShellJob struct {
-	sync.RWMutex
+	sync.Mutex
 	cmd       string
 	exitCode  int
 	stdout    string
@@ -126,36 +127,37 @@ func (sh *ShellJob) Execute(ctx context.Context) {
 
 // ExitCode returns the exit code of the ShellJob.
 func (sh *ShellJob) ExitCode() int {
-	sh.RLock()
-	defer sh.RUnlock()
+	sh.Lock()
+	defer sh.Unlock()
 	return sh.exitCode
 }
 
 // Stdout returns the captured stdout output of the ShellJob.
 func (sh *ShellJob) Stdout() string {
-	sh.RLock()
-	defer sh.RUnlock()
+	sh.Lock()
+	defer sh.Unlock()
 	return sh.stdout
 }
 
 // Stderr returns the captured stderr output of the ShellJob.
 func (sh *ShellJob) Stderr() string {
-	sh.RLock()
-	defer sh.RUnlock()
+	sh.Lock()
+	defer sh.Unlock()
 	return sh.stderr
 }
 
 // JobStatus returns the status of the ShellJob.
 func (sh *ShellJob) JobStatus() JobStatus {
-	sh.RLock()
-	defer sh.RUnlock()
+	sh.Lock()
+	defer sh.Unlock()
 	return sh.jobStatus
 }
 
 // CurlJob represents a cURL command Job, implements the quartz.Job interface.
-// cURL is a command-line tool for getting or sending data including files using URL syntax.
+// cURL is a command-line tool for getting or sending data including files
+// using URL syntax.
 type CurlJob struct {
-	sync.RWMutex
+	sync.Mutex
 	httpClient  HTTPHandler
 	request     *http.Request
 	response    *http.Response
@@ -205,15 +207,15 @@ func (cu *CurlJob) Key() int {
 
 // Response returns the response of the CurlJob.
 func (cu *CurlJob) Response() *http.Response {
-	cu.RLock()
-	defer cu.RUnlock()
+	cu.Lock()
+	defer cu.Unlock()
 	return cu.response
 }
 
 // JobStatus returns the status of the CurlJob.
 func (cu *CurlJob) JobStatus() JobStatus {
-	cu.RLock()
-	defer cu.RUnlock()
+	cu.Lock()
+	defer cu.Unlock()
 	return cu.jobStatus
 }
 
