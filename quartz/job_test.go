@@ -191,7 +191,6 @@ func TestCurlJobDescription(t *testing.T) {
 			opts := quartz.CurlJobOptions{HTTPClient: http.DefaultClient}
 			httpJob := quartz.NewCurlJobWithOptions(tt.request, opts)
 			assertEqual(t, httpJob.Description(), tt.expectedDescription)
-			assertEqual(t, httpJob.Response(), nil)
 		})
 	}
 }

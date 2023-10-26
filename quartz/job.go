@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"os/exec"
 	"strings"
 	"sync"
@@ -205,11 +206,13 @@ func (cu *CurlJob) Key() int {
 	return HashCode(cu.description)
 }
 
-// Response returns the response of the CurlJob.
-func (cu *CurlJob) Response() *http.Response {
+// DumpResponse returns the response of the job in its HTTP/1.x wire
+// representation.
+// If body is true, DumpResponse also returns the body.
+func (cu *CurlJob) DumpResponse(body bool) ([]byte, error) {
 	cu.Lock()
 	defer cu.Unlock()
-	return cu.response
+	return httputil.DumpResponse(cu.response, body)
 }
 
 // JobStatus returns the status of the CurlJob.

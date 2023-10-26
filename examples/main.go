@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -99,11 +98,11 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 	fmt.Println(sched.GetJobKeys())
 	fmt.Println(shellJob.Stdout())
 
-	responseBody, err := io.ReadAll(curlJob.Response().Body)
+	response, err := curlJob.DumpResponse(true)
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Printf("%s\n%s\n", curlJob.Response().Status, string(responseBody))
+		fmt.Println(string(response))
 	}
 	fmt.Printf("Function job result: %v\n", *functionJob.Result())
 

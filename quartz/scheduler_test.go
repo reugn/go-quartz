@@ -62,6 +62,8 @@ func TestScheduler(t *testing.T) {
 
 	sched.Clear()
 	sched.Stop()
+	_, err = curlJob.DumpResponse(true)
+	assertEqual(t, err, nil)
 	assertEqual(t, shellJob.JobStatus(), quartz.OK)
 	assertEqual(t, curlJob.JobStatus(), quartz.OK)
 	assertEqual(t, errShellJob.JobStatus(), quartz.FAILURE)
