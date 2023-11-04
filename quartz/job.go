@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"os/exec"
 	"strings"
 	"sync"
@@ -14,10 +15,11 @@ import (
 	"github.com/reugn/go-quartz/quartz/logger"
 )
 
-// Job represents an interface to be implemented by structs which represent a 'job'
-// to be performed.
+// Job represents an interface to be implemented by structs which
+// represent a 'job' to be performed.
 type Job interface {
-	// Execute is called by a Scheduler when the Trigger associated with this job fires.
+	// Execute is called by a Scheduler when the Trigger associated
+	// with this job fires.
 	Execute(context.Context)
 
 	// Description returns the description of the Job.
@@ -44,26 +46,35 @@ const (
 // ShellJob represents a shell command Job, implements the quartz.Job interface.
 // Be aware of runtime.GOOS when sending shell commands for execution.
 type ShellJob struct {
-	Cmd       string
-	Result    string
-	ExitCode  int
-	Stdout    string
-	Stderr    string
-	JobStatus JobStatus
+	sync.Mutex
+	cmd       string
+	exitCode  int
+	stdout    string
+	stderr    string
+	jobStatus JobStatus
+	callback  func(context.Context, *ShellJob)
 }
 
-// NewShellJob returns a new ShellJob.
+// NewShellJob returns a new ShellJob for the given command.
 func NewShellJob(cmd string) *ShellJob {
 	return &ShellJob{
-		Cmd:       cmd,
-		Result:    "",
-		JobStatus: NA,
+		cmd:       cmd,
+		jobStatus: NA,
+	}
+}
+
+// NewShellJobWithCallback returns a new ShellJob with the given callback function.
+func NewShellJobWithCallback(cmd string, f func(context.Context, *ShellJob)) *ShellJob {
+	return &ShellJob{
+		cmd:       cmd,
+		jobStatus: NA,
+		callback:  f,
 	}
 }
 
 // Description returns the description of the ShellJob.
 func (sh *ShellJob) Description() string {
-	return fmt.Sprintf("ShellJob: %s", sh.Cmd)
+	return fmt.Sprintf("ShellJob: %s", sh.cmd)
 }
 
 // Key returns the unique ShellJob key.
@@ -76,7 +87,7 @@ var (
 	shellPath = "bash"
 )
 
-func (sh *ShellJob) getShell() string {
+func getShell() string {
 	shellOnce.Do(func() {
 		_, err := exec.LookPath("/bin/bash")
 		// if not found bash binary, use `sh`.
@@ -89,36 +100,71 @@ func (sh *ShellJob) getShell() string {
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (sh *ShellJob) Execute(ctx context.Context) {
-	shell := sh.getShell()
+	shell := getShell()
 
-	var stdout, stderr, result bytes.Buffer
-	cmd := exec.CommandContext(ctx, shell, "-c", sh.Cmd)
-	cmd.Stdout = io.MultiWriter(&stdout, &result)
-	cmd.Stderr = io.MultiWriter(&stderr, &result)
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, shell, "-c", sh.cmd)
+	cmd.Stdout = io.Writer(&stdout)
+	cmd.Stderr = io.Writer(&stderr)
 
 	err := cmd.Run()
-	sh.Stdout = stdout.String()
-	sh.Stderr = stderr.String()
-	sh.ExitCode = cmd.ProcessState.ExitCode()
+
+	sh.Lock()
+	sh.stdout = stdout.String()
+	sh.stderr = stderr.String()
+	sh.exitCode = cmd.ProcessState.ExitCode()
 
 	if err != nil {
-		sh.JobStatus = FAILURE
-		sh.Result = err.Error()
-		return
+		sh.jobStatus = FAILURE
+	} else {
+		sh.jobStatus = OK
 	}
 
-	sh.JobStatus = OK
-	sh.Result = result.String()
+	if sh.callback != nil {
+		sh.callback(ctx, sh)
+	}
+	sh.Unlock()
+}
+
+// ExitCode returns the exit code of the ShellJob.
+func (sh *ShellJob) ExitCode() int {
+	sh.Lock()
+	defer sh.Unlock()
+	return sh.exitCode
+}
+
+// Stdout returns the captured stdout output of the ShellJob.
+func (sh *ShellJob) Stdout() string {
+	sh.Lock()
+	defer sh.Unlock()
+	return sh.stdout
+}
+
+// Stderr returns the captured stderr output of the ShellJob.
+func (sh *ShellJob) Stderr() string {
+	sh.Lock()
+	defer sh.Unlock()
+	return sh.stderr
+}
+
+// JobStatus returns the status of the ShellJob.
+func (sh *ShellJob) JobStatus() JobStatus {
+	sh.Lock()
+	defer sh.Unlock()
+	return sh.jobStatus
 }
 
 // CurlJob represents a cURL command Job, implements the quartz.Job interface.
-// cURL is a command-line tool for getting or sending data including files using URL syntax.
+// cURL is a command-line tool for getting or sending data including files
+// using URL syntax.
 type CurlJob struct {
+	sync.Mutex
 	httpClient  HTTPHandler
 	request     *http.Request
-	Response    *http.Response
-	JobStatus   JobStatus
+	response    *http.Response
+	jobStatus   JobStatus
 	description string
+	callback    func(context.Context, *CurlJob)
 }
 
 // HTTPHandler sends an HTTP request and returns an HTTP response,
@@ -128,19 +174,26 @@ type HTTPHandler interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// NewCurlJob returns a new CurlJob using the default HTTP client.
-func NewCurlJob(request *http.Request) (*CurlJob, error) {
-	return NewCurlJobWithHTTPClient(request, http.DefaultClient)
+// CurlJobOptions represents optional parameters for constructing a CurlJob.
+type CurlJobOptions struct {
+	HTTPClient HTTPHandler
+	Callback   func(context.Context, *CurlJob)
 }
 
-// NewCurlJobWithHTTPClient returns a new CurlJob using a custom HTTP client.
-func NewCurlJobWithHTTPClient(request *http.Request, httpClient HTTPHandler) (*CurlJob, error) {
+// NewCurlJob returns a new CurlJob using the default HTTP client.
+func NewCurlJob(request *http.Request) *CurlJob {
+	return NewCurlJobWithOptions(request, CurlJobOptions{HTTPClient: http.DefaultClient})
+}
+
+// NewCurlJobWithOptions returns a new CurlJob configured with CurlJobOptions.
+func NewCurlJobWithOptions(request *http.Request, opts CurlJobOptions) *CurlJob {
 	return &CurlJob{
-		httpClient:  httpClient,
+		httpClient:  opts.HTTPClient,
 		request:     request,
-		JobStatus:   NA,
+		jobStatus:   NA,
 		description: formatRequest(request),
-	}, nil
+		callback:    opts.Callback,
+	}
 }
 
 // Description returns the description of the CurlJob.
@@ -151,6 +204,22 @@ func (cu *CurlJob) Description() string {
 // Key returns the unique CurlJob key.
 func (cu *CurlJob) Key() int {
 	return HashCode(cu.description)
+}
+
+// DumpResponse returns the response of the job in its HTTP/1.x wire
+// representation.
+// If body is true, DumpResponse also returns the body.
+func (cu *CurlJob) DumpResponse(body bool) ([]byte, error) {
+	cu.Lock()
+	defer cu.Unlock()
+	return httputil.DumpResponse(cu.response, body)
+}
+
+// JobStatus returns the status of the CurlJob.
+func (cu *CurlJob) JobStatus() JobStatus {
+	cu.Lock()
+	defer cu.Unlock()
+	return cu.jobStatus
 }
 
 func formatRequest(r *http.Request) string {
@@ -170,14 +239,21 @@ func formatRequest(r *http.Request) string {
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (cu *CurlJob) Execute(ctx context.Context) {
+	cu.Lock()
+	defer cu.Unlock()
+
 	cu.request = cu.request.WithContext(ctx)
 	var err error
-	cu.Response, err = cu.httpClient.Do(cu.request)
+	cu.response, err = cu.httpClient.Do(cu.request)
 
-	if err == nil && cu.Response.StatusCode >= 200 && cu.Response.StatusCode < 400 {
-		cu.JobStatus = OK
+	if err == nil && cu.response.StatusCode >= 200 && cu.response.StatusCode < 400 {
+		cu.jobStatus = OK
 	} else {
-		cu.JobStatus = FAILURE
+		cu.jobStatus = FAILURE
+	}
+
+	if cu.callback != nil {
+		cu.callback(ctx, cu)
 	}
 }
 
