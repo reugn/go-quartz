@@ -37,6 +37,7 @@ func TestScheduler(t *testing.T) {
 	jobKeys[3] = errCurlJob.Key()
 
 	sched.Start(ctx)
+	assertEqual(t, sched.IsStarted(), true)
 	sched.ScheduleJob(ctx, shellJob, quartz.NewSimpleTrigger(time.Millisecond*800))
 	sched.ScheduleJob(ctx, curlJob, quartz.NewRunOnceTrigger(time.Millisecond))
 	sched.ScheduleJob(ctx, errShellJob, quartz.NewRunOnceTrigger(time.Millisecond))
@@ -47,14 +48,17 @@ func TestScheduler(t *testing.T) {
 	assertEqual(t, scheduledJobKeys, []int{3668896347, 2787962474})
 
 	_, err = sched.GetScheduledJob(jobKeys[0])
-	if err != nil {
-		t.Fail()
-	}
+	assertEqual(t, err, nil)
 
 	err = sched.DeleteJob(shellJob.Key())
-	if err != nil {
-		t.Fail()
-	}
+	assertEqual(t, err, nil)
+
+	nonExistentJobKey := 1111
+	_, err = sched.GetScheduledJob(nonExistentJobKey)
+	assertNotEqual(t, err, nil)
+
+	err = sched.DeleteJob(nonExistentJobKey)
+	assertNotEqual(t, err, nil)
 
 	scheduledJobKeys = sched.GetJobKeys()
 	assertEqual(t, len(scheduledJobKeys), 1)

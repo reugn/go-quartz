@@ -35,6 +35,7 @@ func TestRunOnceTrigger(t *testing.T) {
 	assertEqual(t, err, nil)
 
 	next, err = trigger.NextFireTime(next)
+	trigger.Description()
 	assertEqual(t, next, 0)
 	assertNotEqual(t, err, nil)
 }

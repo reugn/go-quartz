@@ -119,11 +119,11 @@ func (sh *ShellJob) Execute(ctx context.Context) {
 	} else {
 		sh.jobStatus = OK
 	}
+	sh.Unlock()
 
 	if sh.callback != nil {
 		sh.callback(ctx, sh)
 	}
-	sh.Unlock()
 }
 
 // ExitCode returns the exit code of the ShellJob.
@@ -187,6 +187,9 @@ func NewCurlJob(request *http.Request) *CurlJob {
 
 // NewCurlJobWithOptions returns a new CurlJob configured with CurlJobOptions.
 func NewCurlJobWithOptions(request *http.Request, opts CurlJobOptions) *CurlJob {
+	if opts.HTTPClient == nil {
+		opts.HTTPClient = http.DefaultClient
+	}
 	return &CurlJob{
 		httpClient:  opts.HTTPClient,
 		request:     request,
@@ -240,8 +243,6 @@ func formatRequest(r *http.Request) string {
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 func (cu *CurlJob) Execute(ctx context.Context) {
 	cu.Lock()
-	defer cu.Unlock()
-
 	cu.request = cu.request.WithContext(ctx)
 	var err error
 	cu.response, err = cu.httpClient.Do(cu.request)
@@ -251,6 +252,7 @@ func (cu *CurlJob) Execute(ctx context.Context) {
 	} else {
 		cu.jobStatus = FAILURE
 	}
+	cu.Unlock()
 
 	if cu.callback != nil {
 		cu.callback(ctx, cu)
