@@ -254,3 +254,37 @@ func TestShellJob_Execute(t *testing.T) {
 	assertEqual(t, 127, sh.ExitCode())
 	// the return value is different under different platforms.
 }
+
+func TestShellJob_WithCallback(t *testing.T) {
+	stdoutShell := "echo -n ok"
+	resultChan := make(chan string, 1)
+	shJob := quartz.NewShellJobWithCallback(
+		stdoutShell,
+		func(_ context.Context, job *quartz.ShellJob) {
+			resultChan <- job.Stdout()
+		},
+	)
+	shJob.Execute(context.Background())
+
+	assertEqual(t, "", shJob.Stderr())
+	assertEqual(t, "ok", shJob.Stdout())
+	assertEqual(t, "ok", <-resultChan)
+}
+
+func TestCurlJob_WithCallback(t *testing.T) {
+	request, err := http.NewRequest(http.MethodGet, worldtimeapiURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultChan := make(chan quartz.JobStatus, 1)
+	opts := quartz.CurlJobOptions{
+		Callback: func(_ context.Context, job *quartz.CurlJob) {
+			resultChan <- job.JobStatus()
+		},
+	}
+	curlJob := quartz.NewCurlJobWithOptions(request, opts)
+	curlJob.Execute(context.Background())
+
+	assertEqual(t, 466866822, curlJob.Key())
+	assertEqual(t, quartz.OK, <-resultChan)
+}
