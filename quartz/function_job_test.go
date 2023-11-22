@@ -30,7 +30,7 @@ func TestFunctionJob(t *testing.T) {
 	sched.ScheduleJob(ctx, funcJob1, quartz.NewRunOnceTrigger(time.Millisecond*300))
 	sched.ScheduleJob(ctx, funcJob2, quartz.NewRunOnceTrigger(time.Millisecond*800))
 	time.Sleep(time.Second)
-	sched.Clear()
+	_ = sched.Clear()
 	sched.Stop()
 
 	assertEqual(t, funcJob1.JobStatus(), quartz.OK)
