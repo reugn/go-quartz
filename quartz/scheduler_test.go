@@ -64,7 +64,8 @@ func TestScheduler(t *testing.T) {
 	assertEqual(t, len(scheduledJobKeys), 1)
 	assertEqual(t, scheduledJobKeys, []int{2787962474})
 
-	sched.Clear()
+	_ = sched.Clear()
+	assertEqual(t, len(sched.GetJobKeys()), 0)
 	sched.Stop()
 	_, err = curlJob.DumpResponse(true)
 	assertEqual(t, err, nil)
@@ -93,7 +94,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 
 			opts.OutdatedThreshold = 10 * time.Millisecond
 
-			sched := quartz.NewStdSchedulerWithOptions(opts)
+			sched := quartz.NewStdSchedulerWithOptions(opts, nil)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			sched.Start(ctx)

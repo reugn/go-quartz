@@ -32,22 +32,23 @@ type Scheduler interface {
 	GetJobKeys() []int
 
 	// GetScheduledJob returns the scheduled job with the specified key.
-	GetScheduledJob(key int) (*ScheduledJob, error)
+	GetScheduledJob(key int) (ScheduledJob, error)
 
-	// DeleteJob removes the job with the specified key from the Scheduler's execution queue.
+	// DeleteJob removes the job with the specified key from the
+	// scheduler's execution queue.
 	DeleteJob(key int) error
 
 	// Clear removes all of the scheduled jobs.
-	Clear()
-
-	// Stop shutdowns the scheduler.
-	Stop()
+	Clear() error
 
 	// Wait blocks until the scheduler stops running and all jobs
 	// have returned. Wait will return when the context passed to
 	// it has expired. Until the context passed to start is
 	// cancelled or Stop is called directly.
 	Wait(context.Context)
+
+	// Stop shutdowns the scheduler.
+	Stop()
 }
 ```
 
@@ -107,6 +108,10 @@ Implemented Jobs
 | Month        | YES       | 1-12 or JAN-DEC | , - * /                    |
 | Day of week  | YES       | 1-7 or SUN-SAT  | , - * ? /                  |
 | Year         | NO        | empty, 1970-    | , - * /                    |
+
+## Distributed mode
+
+The scheduler can use its own implementation of `quartz.JobQueue` to allow state sharing.
 
 ## Logger
 

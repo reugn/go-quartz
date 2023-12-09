@@ -1,7 +1,6 @@
 package quartz
 
 import (
-	"container/heap"
 	"context"
 	"errors"
 	"sync"
@@ -10,11 +9,12 @@ import (
 	"github.com/reugn/go-quartz/quartz/logger"
 )
 
-// ScheduledJob wraps a scheduled Job with its metadata.
-type ScheduledJob struct {
-	Job                Job
-	TriggerDescription string
-	NextRunTime        int64
+// ScheduledJob represents a scheduled Job with the Trigger associated
+// with it and the next run epoch time.
+type ScheduledJob interface {
+	Job() Job
+	Trigger() Trigger
+	NextRunTime() int64
 }
 
 // Scheduler represents a Job orchestrator.
@@ -36,13 +36,14 @@ type Scheduler interface {
 	GetJobKeys() []int
 
 	// GetScheduledJob returns the scheduled job with the specified key.
-	GetScheduledJob(key int) (*ScheduledJob, error)
+	GetScheduledJob(key int) (ScheduledJob, error)
 
-	// DeleteJob removes the job with the specified key from the Scheduler's execution queue.
+	// DeleteJob removes the job with the specified key from the
+	// scheduler's execution queue.
 	DeleteJob(key int) error
 
 	// Clear removes all of the scheduled jobs.
-	Clear()
+	Clear() error
 
 	// Wait blocks until the scheduler stops running and all jobs
 	// have returned. Wait will return when the context passed to
@@ -57,12 +58,12 @@ type Scheduler interface {
 // StdScheduler implements the quartz.Scheduler interface.
 type StdScheduler struct {
 	mtx       sync.Mutex
-	wg        *sync.WaitGroup
-	queue     *priorityQueue
+	wg        sync.WaitGroup
+	queue     JobQueue
 	interrupt chan struct{}
 	cancel    context.CancelFunc
-	feeder    chan *item
-	dispatch  chan *item
+	feeder    chan ScheduledJob
+	dispatch  chan ScheduledJob
 	started   bool
 	opts      StdSchedulerOptions
 }
@@ -99,38 +100,52 @@ type StdSchedulerOptions struct {
 // Verify StdScheduler satisfies the Scheduler interface.
 var _ Scheduler = (*StdScheduler)(nil)
 
-// NewStdScheduler returns a new StdScheduler with the default configuration.
+// NewStdScheduler returns a new StdScheduler with the default
+// configuration.
 func NewStdScheduler() Scheduler {
 	return NewStdSchedulerWithOptions(StdSchedulerOptions{
 		OutdatedThreshold: 100 * time.Millisecond,
-	})
+	}, nil)
 }
 
-// NewStdSchedulerWithOptions returns a new StdScheduler configured as specified.
-func NewStdSchedulerWithOptions(opts StdSchedulerOptions) *StdScheduler {
+// NewStdSchedulerWithOptions returns a new StdScheduler configured
+// as specified.
+// A custom JobQueue implementation can be provided to manage scheduled
+// jobs. This can be useful when distributed mode is required, so that
+// jobs can be stored in persistent storage.
+// Pass in nil to use the internal in-memory implementation.
+func NewStdSchedulerWithOptions(
+	opts StdSchedulerOptions,
+	jobQueue JobQueue,
+) *StdScheduler {
+	if jobQueue == nil {
+		jobQueue = newJobQueue()
+	}
 	return &StdScheduler{
-		queue:     &priorityQueue{},
-		wg:        &sync.WaitGroup{},
+		queue:     jobQueue,
 		interrupt: make(chan struct{}, 1),
-		feeder:    make(chan *item),
-		dispatch:  make(chan *item),
+		feeder:    make(chan ScheduledJob),
+		dispatch:  make(chan ScheduledJob),
 		opts:      opts,
 	}
 }
 
 // ScheduleJob schedules a Job using a specified Trigger.
-func (sched *StdScheduler) ScheduleJob(ctx context.Context, job Job, trigger Trigger) error {
+func (sched *StdScheduler) ScheduleJob(
+	ctx context.Context,
+	job Job,
+	trigger Trigger,
+) error {
 	nextRunTime, err := trigger.NextFireTime(NowNano())
 	if err != nil {
 		return err
 	}
 
 	select {
-	case sched.feeder <- &item{
-		Job:      job,
-		Trigger:  trigger,
+	case sched.feeder <- &scheduledJob{
+		job:      job,
+		trigger:  trigger,
 		priority: nextRunTime,
-		index:    0,
 	}:
 		return nil
 	case <-ctx.Done():
@@ -158,7 +173,7 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 	sched.wg.Add(1)
 	go sched.startExecutionLoop(ctx)
 
-	// starts worker pool when WorkerLimit is > 0
+	// starts worker pool when WorkerLimit is greater than 0
 	sched.startWorkers(ctx)
 
 	sched.started = true
@@ -187,26 +202,22 @@ func (sched *StdScheduler) GetJobKeys() []int {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 
-	keys := make([]int, 0, sched.queue.Len())
-	for _, item := range *sched.queue {
-		keys = append(keys, item.Job.Key())
+	keys := make([]int, 0, sched.queue.Size())
+	for _, scheduled := range sched.queue.ScheduledJobs() {
+		keys = append(keys, scheduled.Job().Key())
 	}
 
 	return keys
 }
 
 // GetScheduledJob returns the ScheduledJob with the specified key.
-func (sched *StdScheduler) GetScheduledJob(key int) (*ScheduledJob, error) {
+func (sched *StdScheduler) GetScheduledJob(key int) (ScheduledJob, error) {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 
-	for _, item := range *sched.queue {
-		if item.Job.Key() == key {
-			return &ScheduledJob{
-				Job:                item.Job,
-				TriggerDescription: item.Trigger.Description(),
-				NextRunTime:        item.priority,
-			}, nil
+	for _, scheduled := range sched.queue.ScheduledJobs() {
+		if scheduled.Job().Key() == key {
+			return scheduled, nil
 		}
 	}
 
@@ -218,10 +229,10 @@ func (sched *StdScheduler) DeleteJob(key int) error {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 
-	for i, item := range *sched.queue {
-		if item.Job.Key() == key {
-			sched.queue.Remove(i)
-			return nil
+	for i, scheduled := range sched.queue.ScheduledJobs() {
+		if scheduled.Job().Key() == key {
+			_, err := sched.queue.Remove(i)
+			return err
 		}
 	}
 
@@ -229,12 +240,12 @@ func (sched *StdScheduler) DeleteJob(key int) error {
 }
 
 // Clear removes all of the scheduled jobs.
-func (sched *StdScheduler) Clear() {
+func (sched *StdScheduler) Clear() error {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 
 	// reset the job queue
-	sched.queue = &priorityQueue{}
+	return sched.queue.Clear()
 }
 
 // Stop exits the StdScheduler execution loop.
@@ -291,8 +302,8 @@ func (sched *StdScheduler) startWorkers(ctx context.Context) {
 					select {
 					case <-ctx.Done():
 						return
-					case item := <-sched.dispatch:
-						item.Job.Execute(ctx)
+					case scheduled := <-sched.dispatch:
+						scheduled.Job().Execute(ctx)
 					}
 				}
 			}()
@@ -304,19 +315,22 @@ func (sched *StdScheduler) queueLen() int {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 
-	return sched.queue.Len()
+	return sched.queue.Size()
 }
 
 func (sched *StdScheduler) calculateNextTick() time.Duration {
-	var interval int64
-
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
-	if sched.queue.Len() > 0 {
-		interval = parkTime(sched.queue.Head().priority)
-	}
 
-	return time.Duration(interval)
+	if sched.queue.Size() > 0 {
+		scheduledJob, err := sched.queue.Head()
+		if err != nil {
+			logger.Warnf("Failed to calculate next tick: %s", err)
+		} else {
+			return time.Duration(parkTime(scheduledJob.NextRunTime()))
+		}
+	}
+	return sched.opts.OutdatedThreshold
 }
 
 func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
@@ -326,25 +340,31 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 		return
 	}
 
-	// fetch an item
-	var it *item
-	var outdatedThreshold int64
-	func() {
-		sched.mtx.Lock()
-		defer sched.mtx.Unlock()
-		it = heap.Pop(sched.queue).(*item)
-		outdatedThreshold = sched.opts.OutdatedThreshold.Nanoseconds()
-	}()
+	// fetch a job for processing
+	sched.mtx.Lock()
+	scheduled, err := sched.queue.Pop()
+	if err != nil {
+		logger.Errorf("Failed to fetch a job from the queue: %s", err)
+		sched.mtx.Unlock()
+		return
+	}
+	sched.mtx.Unlock()
 
-	// execute the Job
-	if !isOutdated(it.priority, outdatedThreshold) {
-		logger.Debugf("Job %d is about to be executed.", it.Job.Key())
+	// check if the job is due to be processed
+	if scheduled.NextRunTime() > NowNano() {
+		logger.Tracef("Job %d is not due to run yet.", scheduled.Job().Key())
+		return
+	}
+
+	// execute the job
+	if sched.jobIsUpToDate(scheduled) {
+		logger.Debugf("Job %d is about to be executed.", scheduled.Job().Key())
 		switch {
 		case sched.opts.BlockingExecution:
-			it.Job.Execute(ctx)
+			scheduled.Job().Execute(ctx)
 		case sched.opts.WorkerLimit > 0:
 			select {
-			case sched.dispatch <- it:
+			case sched.dispatch <- scheduled:
 			case <-ctx.Done():
 				return
 			}
@@ -352,37 +372,53 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 			sched.wg.Add(1)
 			go func() {
 				defer sched.wg.Done()
-				it.Job.Execute(ctx)
+				scheduled.Job().Execute(ctx)
 			}()
 		}
 	} else {
-		logger.Debugf("Job %d skipped as outdated %d.", it.Job.Key(), it.priority)
+		logger.Debugf("Job %d skipped as outdated %d.", scheduled.Job().Key(),
+			scheduled.NextRunTime())
 	}
 
-	// reschedule the Job
-	nextRunTime, err := it.Trigger.NextFireTime(it.priority)
+	// reschedule the job
+	sched.rescheduleJob(ctx, scheduled)
+}
+
+func (sched *StdScheduler) rescheduleJob(ctx context.Context, job ScheduledJob) {
+	nextRunTime, err := job.Trigger().NextFireTime(job.NextRunTime())
 	if err != nil {
-		logger.Infof("The Job '%s' got out the execution loop: %s.", it.Job.Description(), err)
+		logger.Infof("Job %d got out the execution loop: %s.", job.Job().Key(), err)
 		return
 	}
-	it.priority = nextRunTime
+
 	select {
 	case <-ctx.Done():
-	case sched.feeder <- it:
+	case sched.feeder <- &scheduledJob{
+		job:      job.Job(),
+		trigger:  job.Trigger(),
+		priority: nextRunTime,
+	}:
 	}
+}
+
+func (sched *StdScheduler) jobIsUpToDate(job ScheduledJob) bool {
+	return job.NextRunTime() > NowNano()-sched.opts.OutdatedThreshold.Nanoseconds()
 }
 
 func (sched *StdScheduler) startFeedReader(ctx context.Context) {
 	defer sched.wg.Done()
 	for {
 		select {
-		case item := <-sched.feeder:
+		case scheduled := <-sched.feeder:
 			func() {
 				sched.mtx.Lock()
 				defer sched.mtx.Unlock()
 
-				heap.Push(sched.queue, item)
-				sched.reset(ctx)
+				if err := sched.queue.Push(scheduled); err != nil {
+					logger.Errorf("Failed to schedule job %d.", scheduled.Job().Key())
+				} else {
+					sched.reset(ctx)
+				}
 			}()
 		case <-ctx.Done():
 			logger.Info("Exit the feed reader.")
