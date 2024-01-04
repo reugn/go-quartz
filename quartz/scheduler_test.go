@@ -50,14 +50,14 @@ func TestScheduler(t *testing.T) {
 	_, err = sched.GetScheduledJob(jobKeys[0])
 	assertEqual(t, err, nil)
 
-	err = sched.DeleteJob(shellJob.Key())
+	err = sched.DeleteJob(ctx, shellJob.Key())
 	assertEqual(t, err, nil)
 
 	nonExistentJobKey := 1111
 	_, err = sched.GetScheduledJob(nonExistentJobKey)
 	assertNotEqual(t, err, nil)
 
-	err = sched.DeleteJob(nonExistentJobKey)
+	err = sched.DeleteJob(ctx, nonExistentJobKey)
 	assertNotEqual(t, err, nil)
 
 	scheduledJobKeys = sched.GetJobKeys()

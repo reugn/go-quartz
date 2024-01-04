@@ -61,7 +61,7 @@ func sampleScheduler(ctx context.Context, wg *sync.WaitGroup) {
 
 	fmt.Println(scheduledJob.Trigger().Description())
 	fmt.Println("Before delete: ", sched.GetJobKeys())
-	_ = sched.DeleteJob(cronJob.Key())
+	_ = sched.DeleteJob(ctx, cronJob.Key())
 	fmt.Println("After delete: ", sched.GetJobKeys())
 
 	time.Sleep(time.Second * 2)

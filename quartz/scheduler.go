@@ -40,7 +40,7 @@ type Scheduler interface {
 
 	// DeleteJob removes the job with the specified key from the
 	// scheduler's execution queue.
-	DeleteJob(key int) error
+	DeleteJob(ctx context.Context, key int) error
 
 	// Clear removes all of the scheduled jobs.
 	Clear() error
@@ -225,13 +225,16 @@ func (sched *StdScheduler) GetScheduledJob(key int) (ScheduledJob, error) {
 }
 
 // DeleteJob removes the Job with the specified key if present.
-func (sched *StdScheduler) DeleteJob(key int) error {
+func (sched *StdScheduler) DeleteJob(ctx context.Context, key int) error {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 
 	for i, scheduled := range sched.queue.ScheduledJobs() {
 		if scheduled.Job().Key() == key {
 			_, err := sched.queue.Remove(i)
+			if err == nil {
+				sched.reset(ctx)
+			}
 			return err
 		}
 	}

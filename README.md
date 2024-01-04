@@ -36,7 +36,7 @@ type Scheduler interface {
 
 	// DeleteJob removes the job with the specified key from the
 	// scheduler's execution queue.
-	DeleteJob(key int) error
+	DeleteJob(ctx context.Context, key int) error
 
 	// Clear removes all of the scheduled jobs.
 	Clear() error
