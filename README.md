@@ -118,7 +118,7 @@ The argument must implement the `logger.Logger` interface.
 The following example shows how to disable library logs.
 
 ```go
-import "github.com/reugn/go-quartz/quartz/logger"
+import "github.com/reugn/go-quartz/logger"
 
 logger.SetDefault(logger.NewSimpleLogger(nil, logger.LevelOff))
 ```
@@ -133,6 +133,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/reugn/go-quartz/job"
 	"github.com/reugn/go-quartz/quartz"
 )
 
@@ -148,12 +149,12 @@ func main() {
 
 	// create jobs
 	cronTrigger, _ := quartz.NewCronTrigger("1/5 * * * * *")
-	shellJob := quartz.NewShellJob("ls -la")
+	shellJob := job.NewShellJob("ls -la")
 
 	request, _ := http.NewRequest(http.MethodGet, "https://worldtimeapi.org/api/timezone/utc", nil)
-	curlJob := quartz.NewCurlJob(request)
+	curlJob := job.NewCurlJob(request)
 
-	functionJob := quartz.NewFunctionJob(func(_ context.Context) (int, error) { return 42, nil })
+	functionJob := job.NewFunctionJob(func(_ context.Context) (int, error) { return 42, nil })
 
 	// register jobs to scheduler
 	sched.ScheduleJob(quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),

@@ -1,4 +1,4 @@
-package quartz_test
+package job_test
 
 import (
 	"context"
@@ -12,14 +12,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reugn/go-quartz/quartz"
+	"github.com/reugn/go-quartz/internal/assert"
+	"github.com/reugn/go-quartz/internal/mock"
+	"github.com/reugn/go-quartz/job"
 )
 
 func TestMultipleExecution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	var n int64
-	job := quartz.NewIsolatedJob(quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
+	job := job.NewIsolatedJob(job.NewFunctionJob(func(ctx context.Context) (bool, error) {
 		atomic.AddInt64(&n, 1)
 		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
@@ -86,14 +88,6 @@ func TestMultipleExecution(t *testing.T) {
 	}
 }
 
-type httpHandlerMock struct {
-	doFunc func(req *http.Request) (*http.Response, error)
-}
-
-func (m httpHandlerMock) Do(req *http.Request) (*http.Response, error) {
-	return m.doFunc(req)
-}
-
 var worldtimeapiURL = "https://worldtimeapi.org/api/timezone/utc"
 
 func TestCurlJob(t *testing.T) {
@@ -101,45 +95,31 @@ func TestCurlJob(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	handlerOk := struct{ httpHandlerMock }{}
-	handlerOk.doFunc = func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: 200,
-			Request:    request,
-		}, nil
-	}
-	handlerErr := struct{ httpHandlerMock }{}
-	handlerErr.doFunc = func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: 500,
-			Request:    request,
-		}, nil
-	}
 
 	tests := []struct {
 		name           string
 		request        *http.Request
-		opts           quartz.CurlJobOptions
-		expectedStatus quartz.JobStatus
+		opts           job.CurlJobOptions
+		expectedStatus job.Status
 	}{
 		{
 			name:           "HTTP 200 OK",
 			request:        request,
-			opts:           quartz.CurlJobOptions{HTTPClient: handlerOk},
-			expectedStatus: quartz.OK,
+			opts:           job.CurlJobOptions{HTTPClient: mock.HTTPHandlerOk},
+			expectedStatus: job.StatusOK,
 		},
 		{
 			name:           "HTTP 500 Internal Server Error",
 			request:        request,
-			opts:           quartz.CurlJobOptions{HTTPClient: handlerErr},
-			expectedStatus: quartz.FAILURE,
+			opts:           job.CurlJobOptions{HTTPClient: mock.HTTPHandlerErr},
+			expectedStatus: job.StatusFailure,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			httpJob := quartz.NewCurlJobWithOptions(tt.request, tt.opts)
+			httpJob := job.NewCurlJobWithOptions(tt.request, tt.opts)
 			httpJob.Execute(context.Background())
-			assertEqual(t, httpJob.JobStatus(), tt.expectedStatus)
+			assert.Equal(t, httpJob.JobStatus(), tt.expectedStatus)
 		})
 	}
 }
@@ -188,9 +168,9 @@ func TestCurlJobDescription(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts := quartz.CurlJobOptions{HTTPClient: http.DefaultClient}
-			httpJob := quartz.NewCurlJobWithOptions(tt.request, opts)
-			assertEqual(t, httpJob.Description(), tt.expectedDescription)
+			opts := job.CurlJobOptions{HTTPClient: http.DefaultClient}
+			httpJob := job.NewCurlJobWithOptions(tt.request, opts)
+			assert.Equal(t, httpJob.Description(), tt.expectedDescription)
 		})
 	}
 }
@@ -238,37 +218,37 @@ func TestShellJob_Execute(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sh := quartz.NewShellJob(tt.args.Cmd)
+			sh := job.NewShellJob(tt.args.Cmd)
 			sh.Execute(context.TODO())
 
-			assertEqual(t, tt.args.ExitCode, sh.ExitCode())
-			assertEqual(t, tt.args.Stderr, sh.Stderr())
-			assertEqual(t, tt.args.Stdout, sh.Stdout())
+			assert.Equal(t, tt.args.ExitCode, sh.ExitCode())
+			assert.Equal(t, tt.args.Stderr, sh.Stderr())
+			assert.Equal(t, tt.args.Stdout, sh.Stdout())
 		})
 	}
 
 	// invalid command
 	stdoutShell := "invalid_command"
-	sh := quartz.NewShellJob(stdoutShell)
+	sh := job.NewShellJob(stdoutShell)
 	sh.Execute(context.Background())
-	assertEqual(t, 127, sh.ExitCode())
+	assert.Equal(t, 127, sh.ExitCode())
 	// the return value is different under different platforms.
 }
 
 func TestShellJob_WithCallback(t *testing.T) {
 	stdoutShell := "echo -n ok"
 	resultChan := make(chan string, 1)
-	shJob := quartz.NewShellJobWithCallback(
+	shJob := job.NewShellJobWithCallback(
 		stdoutShell,
-		func(_ context.Context, job *quartz.ShellJob) {
+		func(_ context.Context, job *job.ShellJob) {
 			resultChan <- job.Stdout()
 		},
 	)
 	shJob.Execute(context.Background())
 
-	assertEqual(t, "", shJob.Stderr())
-	assertEqual(t, "ok", shJob.Stdout())
-	assertEqual(t, "ok", <-resultChan)
+	assert.Equal(t, "", shJob.Stderr())
+	assert.Equal(t, "ok", shJob.Stdout())
+	assert.Equal(t, "ok", <-resultChan)
 }
 
 func TestCurlJob_WithCallback(t *testing.T) {
@@ -276,14 +256,14 @@ func TestCurlJob_WithCallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resultChan := make(chan quartz.JobStatus, 1)
-	opts := quartz.CurlJobOptions{
-		Callback: func(_ context.Context, job *quartz.CurlJob) {
+	resultChan := make(chan job.Status, 1)
+	opts := job.CurlJobOptions{
+		Callback: func(_ context.Context, job *job.CurlJob) {
 			resultChan <- job.JobStatus()
 		},
 	}
-	curlJob := quartz.NewCurlJobWithOptions(request, opts)
+	curlJob := job.NewCurlJobWithOptions(request, opts)
 	curlJob.Execute(context.Background())
 
-	assertEqual(t, quartz.OK, <-resultChan)
+	assert.Equal(t, job.StatusOK, <-resultChan)
 }

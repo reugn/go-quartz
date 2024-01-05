@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/reugn/go-quartz/internal/assert"
 	"github.com/reugn/go-quartz/quartz"
 )
 
@@ -14,16 +15,16 @@ func TestSimpleTrigger(t *testing.T) {
 	trigger.Description()
 
 	next, err := trigger.NextFireTime(fromEpoch)
-	assertEqual(t, next, 1577836805000000000)
-	assertEqual(t, err, nil)
+	assert.Equal(t, next, 1577836805000000000)
+	assert.Equal(t, err, nil)
 
 	next, err = trigger.NextFireTime(next)
-	assertEqual(t, next, 1577836810000000000)
-	assertEqual(t, err, nil)
+	assert.Equal(t, next, 1577836810000000000)
+	assert.Equal(t, err, nil)
 
 	next, err = trigger.NextFireTime(next)
-	assertEqual(t, next, 1577836815000000000)
-	assertEqual(t, err, nil)
+	assert.Equal(t, next, 1577836815000000000)
+	assert.Equal(t, err, nil)
 }
 
 func TestRunOnceTrigger(t *testing.T) {
@@ -31,11 +32,11 @@ func TestRunOnceTrigger(t *testing.T) {
 	trigger.Description()
 
 	next, err := trigger.NextFireTime(fromEpoch)
-	assertEqual(t, next, 1577836805000000000)
-	assertEqual(t, err, nil)
+	assert.Equal(t, next, 1577836805000000000)
+	assert.Equal(t, err, nil)
 
 	next, err = trigger.NextFireTime(next)
 	trigger.Description()
-	assertEqual(t, next, 0)
-	assertNotEqual(t, err, nil)
+	assert.Equal(t, next, 0)
+	assert.NotEqual(t, err, nil)
 }

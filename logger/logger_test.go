@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/reugn/go-quartz/quartz/logger"
+	"github.com/reugn/go-quartz/logger"
 )
 
 func TestSimpleLogger(t *testing.T) {
