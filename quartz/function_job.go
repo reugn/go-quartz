@@ -21,6 +21,8 @@ type FunctionJob[R any] struct {
 	jobStatus JobStatus
 }
 
+var _ Job = (*FunctionJob[any])(nil)
+
 // NewFunctionJob returns a new FunctionJob without an explicit description.
 func NewFunctionJob[R any](function Function[R]) *FunctionJob[R] {
 	return &FunctionJob[R]{
@@ -44,14 +46,9 @@ func (f *FunctionJob[R]) Description() string {
 	return f.desc
 }
 
-// Key returns the unique FunctionJob key.
-func (f *FunctionJob[R]) Key() int {
-	return HashCode(fmt.Sprintf("%s:%p", f.desc, f.function))
-}
-
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
 // It invokes the held function, setting the results in Result and Error members.
-func (f *FunctionJob[R]) Execute(ctx context.Context) {
+func (f *FunctionJob[R]) Execute(ctx context.Context) error {
 	result, err := (*f.function)(ctx)
 	f.Lock()
 	if err != nil {
@@ -64,6 +61,7 @@ func (f *FunctionJob[R]) Execute(ctx context.Context) {
 		f.err = nil
 	}
 	f.Unlock()
+	return err
 }
 
 // Result returns the result of the FunctionJob.

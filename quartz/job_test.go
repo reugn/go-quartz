@@ -285,6 +285,5 @@ func TestCurlJob_WithCallback(t *testing.T) {
 	curlJob := quartz.NewCurlJobWithOptions(request, opts)
 	curlJob.Execute(context.Background())
 
-	assertEqual(t, 466866822, curlJob.Key())
 	assertEqual(t, quartz.OK, <-resultChan)
 }

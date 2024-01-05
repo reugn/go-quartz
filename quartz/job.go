@@ -3,6 +3,7 @@ package quartz
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,8 +12,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-
-	"github.com/reugn/go-quartz/quartz/logger"
 )
 
 // Job represents an interface to be implemented by structs which
@@ -20,13 +19,10 @@ import (
 type Job interface {
 	// Execute is called by a Scheduler when the Trigger associated
 	// with this job fires.
-	Execute(context.Context)
+	Execute(context.Context) error
 
 	// Description returns the description of the Job.
 	Description() string
-
-	// Key returns the unique key for the Job.
-	Key() int
 }
 
 // JobStatus represents a Job status.
@@ -55,6 +51,8 @@ type ShellJob struct {
 	callback  func(context.Context, *ShellJob)
 }
 
+var _ Job = (*ShellJob)(nil)
+
 // NewShellJob returns a new ShellJob for the given command.
 func NewShellJob(cmd string) *ShellJob {
 	return &ShellJob{
@@ -77,11 +75,6 @@ func (sh *ShellJob) Description() string {
 	return fmt.Sprintf("ShellJob: %s", sh.cmd)
 }
 
-// Key returns the unique ShellJob key.
-func (sh *ShellJob) Key() int {
-	return HashCode(sh.Description())
-}
-
 var (
 	shellOnce = sync.Once{}
 	shellPath = "bash"
@@ -99,7 +92,7 @@ func getShell() string {
 }
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
-func (sh *ShellJob) Execute(ctx context.Context) {
+func (sh *ShellJob) Execute(ctx context.Context) error {
 	shell := getShell()
 
 	var stdout, stderr bytes.Buffer
@@ -124,6 +117,7 @@ func (sh *ShellJob) Execute(ctx context.Context) {
 	if sh.callback != nil {
 		sh.callback(ctx, sh)
 	}
+	return nil
 }
 
 // ExitCode returns the exit code of the ShellJob.
@@ -167,6 +161,8 @@ type CurlJob struct {
 	callback    func(context.Context, *CurlJob)
 }
 
+var _ Job = (*CurlJob)(nil)
+
 // HTTPHandler sends an HTTP request and returns an HTTP response,
 // following policy (such as redirects, cookies, auth) as configured
 // on the implementing HTTP client.
@@ -204,11 +200,6 @@ func (cu *CurlJob) Description() string {
 	return fmt.Sprintf("CurlJob:\n%s", cu.description)
 }
 
-// Key returns the unique CurlJob key.
-func (cu *CurlJob) Key() int {
-	return HashCode(cu.description)
-}
-
 // DumpResponse returns the response of the job in its HTTP/1.x wire
 // representation.
 // If body is true, DumpResponse also returns the body.
@@ -241,7 +232,7 @@ func formatRequest(r *http.Request) string {
 }
 
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
-func (cu *CurlJob) Execute(ctx context.Context) {
+func (cu *CurlJob) Execute(ctx context.Context) error {
 	cu.Lock()
 	cu.request = cu.request.WithContext(ctx)
 	var err error
@@ -257,6 +248,7 @@ func (cu *CurlJob) Execute(ctx context.Context) {
 	if cu.callback != nil {
 		cu.callback(ctx, cu)
 	}
+	return nil
 }
 
 type isolatedJob struct {
@@ -265,15 +257,16 @@ type isolatedJob struct {
 	isRunning *atomic.Value
 }
 
+var _ Job = (*isolatedJob)(nil)
+
 // Execute is called by a Scheduler when the Trigger associated with this job fires.
-func (j *isolatedJob) Execute(ctx context.Context) {
+func (j *isolatedJob) Execute(ctx context.Context) error {
 	if wasRunning := j.isRunning.Swap(true); wasRunning != nil && wasRunning.(bool) {
-		logger.Debugf("Executed job %d is running.", j.Job.Key())
-		return
+		return errors.New("job is running")
 	}
 	defer j.isRunning.Store(false)
 
-	j.Job.Execute(ctx)
+	return j.Job.Execute(ctx)
 }
 
 // NewIsolatedJob wraps a job object and ensures that only one

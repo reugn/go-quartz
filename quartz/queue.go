@@ -3,12 +3,14 @@ package quartz
 import (
 	"container/heap"
 	"errors"
+	"fmt"
+	"sync"
 )
 
 // scheduledJob represents a scheduled job.
 // It implements the ScheduledJob interface.
 type scheduledJob struct {
-	job      Job
+	job      *JobDetail
 	trigger  Trigger
 	priority int64 // job priority, backed by its next run time.
 	index    int   // maintained by the heap.Interface methods.
@@ -17,7 +19,7 @@ type scheduledJob struct {
 var _ ScheduledJob = (*scheduledJob)(nil)
 
 // Job returns the scheduled job instance.
-func (scheduled *scheduledJob) Job() Job {
+func (scheduled *scheduledJob) JobDetail() *JobDetail {
 	return scheduled.job
 }
 
@@ -32,22 +34,26 @@ func (scheduled *scheduledJob) NextRunTime() int64 {
 }
 
 // JobQueue represents the job queue used by the scheduler.
-// The default jobQueue implementation uses an in-memory priority queue
-// to manage scheduled jobs.
-// An alternative implementation can be provided for customization, e.g.
-// to support persistent storage.
+// The default jobQueue implementation uses an in-memory priority queue that orders
+// scheduled jobs by their next execution time, when the job with the closest time
+// being removed and returned first.
+// An alternative implementation can be provided for customization, e.g. to support
+// persistent storage.
+// The implementation is required to be thread safe.
 type JobQueue interface {
-	// Push inserts a new scheduled job at the end of the queue.
+	// Push inserts a new scheduled job to the queue.
+	// This method is also used by the Scheduler to reschedule existing jobs that
+	// have been dequeued for execution.
 	Push(job ScheduledJob) error
 
-	// Pop removes and returns the next scheduled job from the queue.
+	// Pop removes and returns the next to run scheduled job from the queue.
 	Pop() (ScheduledJob, error)
 
-	// Head returns the first scheduled job without removing it.
+	// Head returns the first scheduled job without removing it from the queue.
 	Head() (ScheduledJob, error)
 
-	// Remove removes and returns the scheduled job at index i.
-	Remove(i int) (ScheduledJob, error)
+	// Remove removes and returns the scheduled job with the specified key.
+	Remove(jobKey *JobKey) (ScheduledJob, error)
 
 	// ScheduledJobs returns the slice of all scheduled jobs in the queue.
 	ScheduledJobs() []ScheduledJob
@@ -104,6 +110,7 @@ func (pq *priorityQueue) Pop() interface{} {
 // jobQueue implements the JobQueue interface by using an in-memory
 // priority queue as the storage layer.
 type jobQueue struct {
+	mtx      sync.Mutex
 	delegate priorityQueue
 }
 
@@ -116,38 +123,68 @@ func newJobQueue() *jobQueue {
 	}
 }
 
-// Push inserts a new scheduled job at the end of the queue.
+// Push inserts a new scheduled job to the queue.
+// This method is also used by the Scheduler to reschedule existing jobs that
+// have been dequeued for execution.
 func (jq *jobQueue) Push(job ScheduledJob) error {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
+	scheduledJobs := jq.scheduledJobs()
+	for i, scheduled := range scheduledJobs {
+		if scheduled.JobDetail().jobKey.Equals(job.JobDetail().jobKey) {
+			if job.JobDetail().opts.Replace {
+				heap.Remove(&jq.delegate, i)
+				break
+			}
+			return fmt.Errorf("job with the key %s already exists",
+				job.JobDetail().jobKey)
+		}
+	}
 	heap.Push(&jq.delegate, job)
 	return nil
 }
 
 // Pop removes and returns the next scheduled job from the queue.
 func (jq *jobQueue) Pop() (ScheduledJob, error) {
-	if jq.Size() == 0 {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
+	if len(jq.delegate) == 0 {
 		return nil, errors.New("queue is empty")
 	}
 	return heap.Pop(&jq.delegate).(ScheduledJob), nil
 }
 
-// Head returns the first scheduled job without removing it.
+// Head returns the first scheduled job without removing it from the queue.
 func (jq *jobQueue) Head() (ScheduledJob, error) {
-	if jq.Size() == 0 {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
+	if len(jq.delegate) == 0 {
 		return nil, errors.New("queue is empty")
 	}
 	return jq.delegate[0], nil
 }
 
-// Remove removes and returns the scheduled job at index i.
-func (jq *jobQueue) Remove(i int) (ScheduledJob, error) {
-	if jq.Size() <= i {
-		return nil, errors.New("index out of range")
+// Remove removes and returns the scheduled job with the specified key.
+func (jq *jobQueue) Remove(jobKey *JobKey) (ScheduledJob, error) {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
+	scheduledJobs := jq.scheduledJobs()
+	for i, scheduled := range scheduledJobs {
+		if scheduled.JobDetail().jobKey.Equals(jobKey) {
+			return heap.Remove(&jq.delegate, i).(ScheduledJob), nil
+		}
 	}
-	return heap.Remove(&jq.delegate, i).(ScheduledJob), nil
+	return nil, errors.New("no job with the given key found")
 }
 
 // ScheduledJobs returns the slice of all scheduled jobs in the queue.
 func (jq *jobQueue) ScheduledJobs() []ScheduledJob {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
+	return jq.scheduledJobs()
+}
+
+func (jq *jobQueue) scheduledJobs() []ScheduledJob {
 	scheduledJobs := make([]ScheduledJob, len(jq.delegate))
 	for i, job := range jq.delegate {
 		scheduledJobs[i] = ScheduledJob(job)
@@ -157,11 +194,15 @@ func (jq *jobQueue) ScheduledJobs() []ScheduledJob {
 
 // Size returns the size of the job queue.
 func (jq *jobQueue) Size() int {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
 	return len(jq.delegate)
 }
 
 // Clear clears the job queue.
 func (jq *jobQueue) Clear() error {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
 	jq.delegate = priorityQueue{}
 	return nil
 }

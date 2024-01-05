@@ -27,8 +27,10 @@ func TestFunctionJob(t *testing.T) {
 
 	sched := quartz.NewStdScheduler()
 	sched.Start(ctx)
-	sched.ScheduleJob(ctx, funcJob1, quartz.NewRunOnceTrigger(time.Millisecond*300))
-	sched.ScheduleJob(ctx, funcJob2, quartz.NewRunOnceTrigger(time.Millisecond*800))
+	sched.ScheduleJob(ctx, quartz.NewJobDetail(funcJob1, quartz.NewJobKey("funcJob1")),
+		quartz.NewRunOnceTrigger(time.Millisecond*300))
+	sched.ScheduleJob(ctx, quartz.NewJobDetail(funcJob2, quartz.NewJobKey("funcJob2")),
+		quartz.NewRunOnceTrigger(time.Millisecond*800))
 	time.Sleep(time.Second)
 	_ = sched.Clear()
 	sched.Stop()
@@ -44,7 +46,7 @@ func TestFunctionJob(t *testing.T) {
 	assertEqual(t, int(atomic.LoadInt32(&n)), 6)
 }
 
-func TestNewFunctionJobWithDescAndKey(t *testing.T) {
+func TestNewFunctionJobWithDesc(t *testing.T) {
 	jobDesc := "test job"
 
 	funcJob1 := quartz.NewFunctionJobWithDesc(jobDesc, func(_ context.Context) (string, error) {
@@ -56,8 +58,7 @@ func TestNewFunctionJobWithDescAndKey(t *testing.T) {
 	})
 
 	assertEqual(t, funcJob1.Description(), jobDesc)
-	assertEqual(t, funcJob1.Key(), funcJob1.Key())
-	assertNotEqual(t, funcJob1.Key(), funcJob2.Key())
+	assertEqual(t, funcJob2.Description(), jobDesc)
 }
 
 func TestFunctionJobRespectsContext(t *testing.T) {
