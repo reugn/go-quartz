@@ -30,7 +30,7 @@ type Scheduler interface {
 	IsStarted() bool
 
 	// ScheduleJob schedules a job using a specified trigger.
-	ScheduleJob(ctx context.Context, jobDetail *JobDetail, trigger Trigger) error
+	ScheduleJob(jobDetail *JobDetail, trigger Trigger) error
 
 	// GetJobKeys returns the keys of all of the scheduled jobs.
 	GetJobKeys() []*JobKey
@@ -40,7 +40,7 @@ type Scheduler interface {
 
 	// DeleteJob removes the job with the specified key from the
 	// scheduler's execution queue.
-	DeleteJob(ctx context.Context, jobKey *JobKey) error
+	DeleteJob(jobKey *JobKey) error
 
 	// Clear removes all of the scheduled jobs.
 	Clear() error
@@ -132,7 +132,6 @@ func NewStdSchedulerWithOptions(
 
 // ScheduleJob schedules a Job using a specified Trigger.
 func (sched *StdScheduler) ScheduleJob(
-	ctx context.Context,
 	jobDetail *JobDetail,
 	trigger Trigger,
 ) error {
@@ -162,7 +161,7 @@ func (sched *StdScheduler) ScheduleJob(
 	if err == nil {
 		logger.Debugf("Successfully added job %s.", jobDetail.jobKey)
 		if sched.IsStarted() {
-			sched.reset(ctx)
+			sched.reset()
 		}
 	}
 	return err
@@ -237,7 +236,7 @@ func (sched *StdScheduler) GetScheduledJob(jobKey *JobKey) (ScheduledJob, error)
 }
 
 // DeleteJob removes the Job with the specified key if present.
-func (sched *StdScheduler) DeleteJob(ctx context.Context, jobKey *JobKey) error {
+func (sched *StdScheduler) DeleteJob(jobKey *JobKey) error {
 	if jobKey == nil {
 		return errors.New("jobKey is nil")
 	}
@@ -245,7 +244,7 @@ func (sched *StdScheduler) DeleteJob(ctx context.Context, jobKey *JobKey) error 
 	if err == nil {
 		logger.Debugf("Successfully deleted job %s.", jobKey)
 		if sched.IsStarted() {
-			sched.reset(ctx)
+			sched.reset()
 		}
 	}
 	return err
@@ -254,7 +253,14 @@ func (sched *StdScheduler) DeleteJob(ctx context.Context, jobKey *JobKey) error 
 // Clear removes all of the scheduled jobs.
 func (sched *StdScheduler) Clear() error {
 	// reset the job queue
-	return sched.queue.Clear()
+	err := sched.queue.Clear()
+	if err == nil {
+		logger.Debug("Successfully cleared job queue.")
+		if sched.IsStarted() {
+			sched.reset()
+		}
+	}
+	return err
 }
 
 // Stop exits the StdScheduler execution loop.
@@ -448,7 +454,7 @@ func (sched *StdScheduler) startFeedReader(ctx context.Context) {
 					scheduled.JobDetail().jobKey, err)
 			} else {
 				logger.Tracef("Successfully rescheduled job %s", scheduled.JobDetail().jobKey)
-				sched.reset(ctx)
+				sched.reset()
 			}
 		case <-ctx.Done():
 			logger.Info("Exit the feed reader.")
@@ -457,10 +463,9 @@ func (sched *StdScheduler) startFeedReader(ctx context.Context) {
 	}
 }
 
-func (sched *StdScheduler) reset(ctx context.Context) {
+func (sched *StdScheduler) reset() {
 	select {
 	case sched.interrupt <- struct{}{}:
-	case <-ctx.Done():
 	default:
 	}
 }

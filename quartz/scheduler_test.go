@@ -48,16 +48,16 @@ func TestScheduler(t *testing.T) {
 	sched.Start(ctx)
 	assertEqual(t, sched.IsStarted(), true)
 
-	err = sched.ScheduleJob(ctx, quartz.NewJobDetail(shellJob, jobKeys[0]),
+	err = sched.ScheduleJob(quartz.NewJobDetail(shellJob, jobKeys[0]),
 		quartz.NewSimpleTrigger(time.Millisecond*700))
 	assertEqual(t, err, nil)
-	err = sched.ScheduleJob(ctx, quartz.NewJobDetail(curlJob, jobKeys[1]),
+	err = sched.ScheduleJob(quartz.NewJobDetail(curlJob, jobKeys[1]),
 		quartz.NewRunOnceTrigger(time.Millisecond))
 	assertEqual(t, err, nil)
-	err = sched.ScheduleJob(ctx, quartz.NewJobDetail(errShellJob, jobKeys[2]),
+	err = sched.ScheduleJob(quartz.NewJobDetail(errShellJob, jobKeys[2]),
 		quartz.NewRunOnceTrigger(time.Millisecond))
 	assertEqual(t, err, nil)
-	err = sched.ScheduleJob(ctx, quartz.NewJobDetail(errCurlJob, jobKeys[3]),
+	err = sched.ScheduleJob(quartz.NewJobDetail(errCurlJob, jobKeys[3]),
 		quartz.NewSimpleTrigger(time.Millisecond*800))
 	assertEqual(t, err, nil)
 
@@ -68,14 +68,14 @@ func TestScheduler(t *testing.T) {
 	_, err = sched.GetScheduledJob(jobKeys[0])
 	assertEqual(t, err, nil)
 
-	err = sched.DeleteJob(ctx, jobKeys[0]) // shellJob key
+	err = sched.DeleteJob(jobKeys[0]) // shellJob key
 	assertEqual(t, err, nil)
 
 	nonExistentJobKey := quartz.NewJobKey("NA")
 	_, err = sched.GetScheduledJob(nonExistentJobKey)
 	assertNotEqual(t, err, nil)
 
-	err = sched.DeleteJob(ctx, nonExistentJobKey)
+	err = sched.DeleteJob(nonExistentJobKey)
 	assertNotEqual(t, err, nil)
 
 	scheduledJobKeys = sched.GetJobKeys()
@@ -133,7 +133,6 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 				quartz.NewJobKey("timerJob"),
 			)
 			err := sched.ScheduleJob(
-				ctx,
 				timerJob,
 				quartz.NewSimpleTrigger(20*time.Millisecond),
 			)
@@ -240,7 +239,6 @@ func TestSchedulerCancel(t *testing.T) {
 				functionJob := quartz.NewJobDetail(quartz.NewFunctionJob(hourJob),
 					quartz.NewJobKey(fmt.Sprintf("functionJob_%d", i)))
 				if err := sched.ScheduleJob(
-					ctx,
 					functionJob,
 					quartz.NewSimpleTrigger(100*time.Millisecond),
 				); err != nil {
