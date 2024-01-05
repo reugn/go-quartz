@@ -49,11 +49,11 @@ func sampleScheduler(ctx context.Context, wg *sync.WaitGroup) {
 	jobDetail1 := quartz.NewJobDetail(&PrintJob{"First job"}, quartz.NewJobKey("job1"))
 	jobDetail2 := quartz.NewJobDetail(&PrintJob{"Second job"}, quartz.NewJobKey("job2"))
 	jobDetail3 := quartz.NewJobDetail(&PrintJob{"Third job"}, quartz.NewJobKey("job3"))
-	_ = sched.ScheduleJob(ctx, runOnceJobDetail, quartz.NewRunOnceTrigger(time.Second*5))
-	_ = sched.ScheduleJob(ctx, jobDetail1, quartz.NewSimpleTrigger(time.Second*12))
-	_ = sched.ScheduleJob(ctx, jobDetail2, quartz.NewSimpleTrigger(time.Second*6))
-	_ = sched.ScheduleJob(ctx, jobDetail3, quartz.NewSimpleTrigger(time.Second*3))
-	_ = sched.ScheduleJob(ctx, cronJob, cronTrigger)
+	_ = sched.ScheduleJob(runOnceJobDetail, quartz.NewRunOnceTrigger(time.Second*5))
+	_ = sched.ScheduleJob(jobDetail1, quartz.NewSimpleTrigger(time.Second*12))
+	_ = sched.ScheduleJob(jobDetail2, quartz.NewSimpleTrigger(time.Second*6))
+	_ = sched.ScheduleJob(jobDetail3, quartz.NewSimpleTrigger(time.Second*3))
+	_ = sched.ScheduleJob(cronJob, cronTrigger)
 
 	time.Sleep(time.Second * 10)
 
@@ -65,7 +65,7 @@ func sampleScheduler(ctx context.Context, wg *sync.WaitGroup) {
 
 	fmt.Println(scheduledJob.Trigger().Description())
 	fmt.Println("Before delete: ", sched.GetJobKeys())
-	_ = sched.DeleteJob(ctx, cronJob.JobKey())
+	_ = sched.DeleteJob(cronJob.JobKey())
 	fmt.Println("After delete: ", sched.GetJobKeys())
 
 	time.Sleep(time.Second * 2)
@@ -96,9 +96,9 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 	shellJobDetail := quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob"))
 	curlJobDetail := quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob"))
 	functionJobDetail := quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob"))
-	_ = sched.ScheduleJob(ctx, shellJobDetail, cronTrigger)
-	_ = sched.ScheduleJob(ctx, curlJobDetail, quartz.NewSimpleTrigger(time.Second*7))
-	_ = sched.ScheduleJob(ctx, functionJobDetail, quartz.NewSimpleTrigger(time.Second*3))
+	_ = sched.ScheduleJob(shellJobDetail, cronTrigger)
+	_ = sched.ScheduleJob(curlJobDetail, quartz.NewSimpleTrigger(time.Second*7))
+	_ = sched.ScheduleJob(functionJobDetail, quartz.NewSimpleTrigger(time.Second*3))
 
 	time.Sleep(time.Second * 10)
 

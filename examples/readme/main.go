@@ -28,11 +28,11 @@ func main() {
 	functionJob := quartz.NewFunctionJob(func(_ context.Context) (int, error) { return 42, nil })
 
 	// register jobs to scheduler
-	sched.ScheduleJob(ctx, quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
+	sched.ScheduleJob(quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
 		cronTrigger)
-	sched.ScheduleJob(ctx, quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
+	sched.ScheduleJob(quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
 		quartz.NewSimpleTrigger(time.Second*7))
-	sched.ScheduleJob(ctx, quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
+	sched.ScheduleJob(quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
 		quartz.NewSimpleTrigger(time.Second*5))
 
 	// stop scheduler

@@ -27,9 +27,9 @@ func TestFunctionJob(t *testing.T) {
 
 	sched := quartz.NewStdScheduler()
 	sched.Start(ctx)
-	sched.ScheduleJob(ctx, quartz.NewJobDetail(funcJob1, quartz.NewJobKey("funcJob1")),
+	sched.ScheduleJob(quartz.NewJobDetail(funcJob1, quartz.NewJobKey("funcJob1")),
 		quartz.NewRunOnceTrigger(time.Millisecond*300))
-	sched.ScheduleJob(ctx, quartz.NewJobDetail(funcJob2, quartz.NewJobKey("funcJob2")),
+	sched.ScheduleJob(quartz.NewJobDetail(funcJob2, quartz.NewJobKey("funcJob2")),
 		quartz.NewRunOnceTrigger(time.Millisecond*800))
 	time.Sleep(time.Second)
 	_ = sched.Clear()

@@ -26,7 +26,7 @@ type Scheduler interface {
 	IsStarted() bool
 
 	// ScheduleJob schedules a job using a specified trigger.
-	ScheduleJob(ctx context.Context, jobDetail *JobDetail, trigger Trigger) error
+	ScheduleJob(jobDetail *JobDetail, trigger Trigger) error
 
 	// GetJobKeys returns the keys of all of the scheduled jobs.
 	GetJobKeys() []*JobKey
@@ -36,7 +36,7 @@ type Scheduler interface {
 
 	// DeleteJob removes the job with the specified key from the
 	// scheduler's execution queue.
-	DeleteJob(ctx context.Context, jobKey *JobKey) error
+	DeleteJob(jobKey *JobKey) error
 
 	// Clear removes all of the scheduled jobs.
 	Clear() error
@@ -156,11 +156,11 @@ func main() {
 	functionJob := quartz.NewFunctionJob(func(_ context.Context) (int, error) { return 42, nil })
 
 	// register jobs to scheduler
-	sched.ScheduleJob(ctx, quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
+	sched.ScheduleJob(quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
 		cronTrigger)
-	sched.ScheduleJob(ctx, quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
+	sched.ScheduleJob(quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
 		quartz.NewSimpleTrigger(time.Second*7))
-	sched.ScheduleJob(ctx, quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
+	sched.ScheduleJob(quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
 		quartz.NewSimpleTrigger(time.Second*5))
 
 	// stop scheduler
