@@ -1,4 +1,4 @@
-package quartz_test
+package job_test
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/reugn/go-quartz/internal/assert"
+	"github.com/reugn/go-quartz/job"
 	"github.com/reugn/go-quartz/quartz"
 )
 
@@ -15,12 +17,12 @@ func TestFunctionJob(t *testing.T) {
 	defer cancel()
 
 	var n int32 = 2
-	funcJob1 := quartz.NewFunctionJob(func(_ context.Context) (string, error) {
+	funcJob1 := job.NewFunctionJob(func(_ context.Context) (string, error) {
 		atomic.AddInt32(&n, 2)
 		return "fired1", nil
 	})
 
-	funcJob2 := quartz.NewFunctionJob(func(_ context.Context) (int, error) {
+	funcJob2 := job.NewFunctionJob(func(_ context.Context) (int, error) {
 		atomic.AddInt32(&n, 2)
 		return 42, nil
 	})
@@ -35,35 +37,35 @@ func TestFunctionJob(t *testing.T) {
 	_ = sched.Clear()
 	sched.Stop()
 
-	assertEqual(t, funcJob1.JobStatus(), quartz.OK)
-	assertNotEqual(t, funcJob1.Result(), nil)
-	assertEqual(t, *funcJob1.Result(), "fired1")
+	assert.Equal(t, funcJob1.JobStatus(), job.StatusOK)
+	assert.NotEqual(t, funcJob1.Result(), nil)
+	assert.Equal(t, *funcJob1.Result(), "fired1")
 
-	assertEqual(t, funcJob2.JobStatus(), quartz.OK)
-	assertNotEqual(t, funcJob2.Result(), nil)
-	assertEqual(t, *funcJob2.Result(), 42)
+	assert.Equal(t, funcJob2.JobStatus(), job.StatusOK)
+	assert.NotEqual(t, funcJob2.Result(), nil)
+	assert.Equal(t, *funcJob2.Result(), 42)
 
-	assertEqual(t, int(atomic.LoadInt32(&n)), 6)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 6)
 }
 
 func TestNewFunctionJobWithDesc(t *testing.T) {
 	jobDesc := "test job"
 
-	funcJob1 := quartz.NewFunctionJobWithDesc(jobDesc, func(_ context.Context) (string, error) {
+	funcJob1 := job.NewFunctionJobWithDesc(jobDesc, func(_ context.Context) (string, error) {
 		return "fired1", nil
 	})
 
-	funcJob2 := quartz.NewFunctionJobWithDesc(jobDesc, func(_ context.Context) (string, error) {
+	funcJob2 := job.NewFunctionJobWithDesc(jobDesc, func(_ context.Context) (string, error) {
 		return "fired2", nil
 	})
 
-	assertEqual(t, funcJob1.Description(), jobDesc)
-	assertEqual(t, funcJob2.Description(), jobDesc)
+	assert.Equal(t, funcJob1.Description(), jobDesc)
+	assert.Equal(t, funcJob2.Description(), jobDesc)
 }
 
 func TestFunctionJobRespectsContext(t *testing.T) {
 	var n int
-	funcJob2 := quartz.NewFunctionJob(func(ctx context.Context) (bool, error) {
+	funcJob2 := job.NewFunctionJob(func(ctx context.Context) (bool, error) {
 		timer := time.NewTimer(time.Hour)
 		defer timer.Stop()
 		select {

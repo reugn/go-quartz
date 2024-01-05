@@ -3,7 +3,7 @@ package quartz
 import (
 	"time"
 
-	CSM "github.com/reugn/go-quartz/quartz/internal/csm"
+	CSM "github.com/reugn/go-quartz/internal/csm"
 )
 
 func makeCSMFromFields(prev time.Time, fields []*cronField) *CSM.CronStateMachine {

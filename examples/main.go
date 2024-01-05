@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/reugn/go-quartz/job"
 	"github.com/reugn/go-quartz/quartz"
 )
 
@@ -84,14 +85,14 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 		return
 	}
 
-	shellJob := quartz.NewShellJob("ls -la")
+	shellJob := job.NewShellJob("ls -la")
 	request, err := http.NewRequest(http.MethodGet, "https://worldtimeapi.org/api/timezone/utc", nil)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	curlJob := quartz.NewCurlJob(request)
-	functionJob := quartz.NewFunctionJobWithDesc("42", func(_ context.Context) (int, error) { return 42, nil })
+	curlJob := job.NewCurlJob(request)
+	functionJob := job.NewFunctionJobWithDesc("42", func(_ context.Context) (int, error) { return 42, nil })
 
 	shellJobDetail := quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob"))
 	curlJobDetail := quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob"))

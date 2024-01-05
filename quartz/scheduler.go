@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/reugn/go-quartz/quartz/logger"
+	"github.com/reugn/go-quartz/logger"
 )
 
 // ScheduledJob represents a scheduled Job with the Trigger associated

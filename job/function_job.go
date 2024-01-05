@@ -1,9 +1,11 @@
-package quartz
+package job
 
 import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/reugn/go-quartz/quartz"
 )
 
 // Function represents an argument-less function which returns
@@ -18,17 +20,17 @@ type FunctionJob[R any] struct {
 	desc      string
 	result    *R
 	err       error
-	jobStatus JobStatus
+	jobStatus Status
 }
 
-var _ Job = (*FunctionJob[any])(nil)
+var _ quartz.Job = (*FunctionJob[any])(nil)
 
 // NewFunctionJob returns a new FunctionJob without an explicit description.
 func NewFunctionJob[R any](function Function[R]) *FunctionJob[R] {
 	return &FunctionJob[R]{
 		function:  &function,
 		desc:      fmt.Sprintf("FunctionJob:%p", &function),
-		jobStatus: NA,
+		jobStatus: StatusNA,
 	}
 }
 
@@ -37,7 +39,7 @@ func NewFunctionJobWithDesc[R any](desc string, function Function[R]) *FunctionJ
 	return &FunctionJob[R]{
 		function:  &function,
 		desc:      desc,
-		jobStatus: NA,
+		jobStatus: StatusNA,
 	}
 }
 
@@ -52,11 +54,11 @@ func (f *FunctionJob[R]) Execute(ctx context.Context) error {
 	result, err := (*f.function)(ctx)
 	f.Lock()
 	if err != nil {
-		f.jobStatus = FAILURE
+		f.jobStatus = StatusFailure
 		f.result = nil
 		f.err = err
 	} else {
-		f.jobStatus = OK
+		f.jobStatus = StatusOK
 		f.result = &result
 		f.err = nil
 	}
@@ -79,7 +81,7 @@ func (f *FunctionJob[R]) Error() error {
 }
 
 // JobStatus returns the status of the FunctionJob.
-func (f *FunctionJob[R]) JobStatus() JobStatus {
+func (f *FunctionJob[R]) JobStatus() Status {
 	f.RLock()
 	defer f.RUnlock()
 	return f.jobStatus
