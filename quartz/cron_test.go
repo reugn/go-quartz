@@ -354,6 +354,11 @@ func TestCronHourly(t *testing.T) {
 	assert.Equal(t, result, "Mon May 27 10:00:00 2019")
 }
 
+func TestCronExpressionInvalidLength(t *testing.T) {
+	_, err := quartz.NewCronTrigger("0 0 0 * *")
+	assert.Equal(t, err.Error(), "invalid cron expression: invalid expression length")
+}
+
 var readDateLayout = "Mon Jan 2 15:04:05 2006"
 
 func iterate(prev int64, cronTrigger *quartz.CronTrigger, iterations int) (string, error) {

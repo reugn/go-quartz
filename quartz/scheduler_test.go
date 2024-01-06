@@ -2,6 +2,7 @@ package quartz_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -23,14 +24,12 @@ func TestScheduler(t *testing.T) {
 	var jobKeys [4]*quartz.JobKey
 
 	shellJob := job.NewShellJob("ls -la")
-	shellJob.Description()
 	jobKeys[0] = quartz.NewJobKey("shellJob")
 
 	request, err := http.NewRequest(http.MethodGet, "https://worldtimeapi.org/api/timezone/utc", nil)
 	assert.Equal(t, err, nil)
 
 	curlJob := job.NewCurlJobWithOptions(request, job.CurlJobOptions{HTTPClient: mock.HTTPHandlerOk})
-	curlJob.Description()
 	jobKeys[1] = quartz.NewJobKey("curlJob")
 
 	errShellJob := job.NewShellJob("ls -z")
@@ -286,4 +285,62 @@ func TestSchedulerCancel(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSchedulerJobWithRetries(t *testing.T) {
+	var n int32
+	funcRetryJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
+		atomic.AddInt32(&n, 1)
+		if n < 3 {
+			return "", errors.New("less than 3")
+		}
+		return "ok", nil
+	})
+	ctx := context.Background()
+	sched := quartz.NewStdScheduler()
+	opts := quartz.NewDefaultJobDetailOptions()
+	opts.MaxRetries = 3
+	opts.RetryInterval = 100 * time.Millisecond
+	jobDetail := quartz.NewJobDetailWithOptions(
+		funcRetryJob,
+		quartz.NewJobKey("funcRetryJob"),
+		opts,
+	)
+	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
+	assert.Equal(t, err, nil)
+
+	sched.Start(ctx)
+	sched.Start(ctx)
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusOK)
+	sched.Stop()
+}
+
+func TestSchedulerArgumentValidationErrors(t *testing.T) {
+	sched := quartz.NewStdScheduler()
+	job := job.NewShellJob("ls -la")
+	trigger := quartz.NewRunOnceTrigger(time.Millisecond)
+	expiredTrigger, err := quartz.NewCronTrigger("0 0 0 1 1 ? 2023")
+	assert.Equal(t, err, nil)
+
+	err = sched.ScheduleJob(nil, trigger)
+	assert.Equal(t, err.Error(), "jobDetail is nil")
+	err = sched.ScheduleJob(quartz.NewJobDetail(job, nil), trigger)
+	assert.Equal(t, err.Error(), "jobDetail.jobKey is nil")
+	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKey("")), trigger)
+	assert.Equal(t, err.Error(), "empty key name is not allowed")
+	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKeyWithGroup("job", "")), nil)
+	assert.Equal(t, err.Error(), "trigger is nil")
+	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKey("job")), expiredTrigger)
+	assert.Equal(t, err.Error(), "next trigger time is in the past")
+
+	err = sched.DeleteJob(nil)
+	assert.Equal(t, err.Error(), "jobKey is nil")
+
+	_, err = sched.GetScheduledJob(nil)
+	assert.Equal(t, err.Error(), "jobKey is nil")
 }
