@@ -2,7 +2,6 @@ package quartz
 
 import (
 	"fmt"
-	"hash/fnv"
 	"strconv"
 	"strings"
 	"time"
@@ -119,11 +118,4 @@ func atoi(str string) int {
 // NowNano returns the current UTC Unix time in nanoseconds.
 func NowNano() int64 {
 	return time.Now().UTC().UnixNano()
-}
-
-// HashCode calculates and returns a hash code for the given string.
-func HashCode(s string) int {
-	h := fnv.New32a()
-	h.Write([]byte(s))
-	return int(h.Sum32())
 }
