@@ -153,7 +153,7 @@ func TestCurlJobDescription(t *testing.T) {
 		{
 			name:    "POST with headers and body",
 			request: postRequest,
-			expectedDescription: "CurlJob:\n" +
+			expectedDescription: "CurlJob::" +
 				fmt.Sprintf("POST %s HTTP/1.1\n", worldtimeapiURL) +
 				"Content-Type: application/json\n" +
 				"Content Length: 7",
@@ -161,7 +161,7 @@ func TestCurlJobDescription(t *testing.T) {
 		{
 			name:    "Get request",
 			request: getRequest,
-			expectedDescription: "CurlJob:\n" +
+			expectedDescription: "CurlJob::" +
 				fmt.Sprintf("GET %s HTTP/1.1", worldtimeapiURL),
 		},
 	}
@@ -224,6 +224,8 @@ func TestShellJob_Execute(t *testing.T) {
 			assert.Equal(t, tt.args.ExitCode, sh.ExitCode())
 			assert.Equal(t, tt.args.Stderr, sh.Stderr())
 			assert.Equal(t, tt.args.Stdout, sh.Stdout())
+			assert.Equal(t, job.StatusOK, sh.JobStatus())
+			assert.Equal(t, fmt.Sprintf("ShellJob::%s", tt.args.Cmd), sh.Description())
 		})
 	}
 

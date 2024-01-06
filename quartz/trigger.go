@@ -38,7 +38,7 @@ func (st *SimpleTrigger) NextFireTime(prev int64) (int64, error) {
 
 // Description returns the description of the trigger.
 func (st *SimpleTrigger) Description() string {
-	return fmt.Sprintf("SimpleTrigger with interval: %d", st.Interval)
+	return fmt.Sprintf("SimpleTrigger%s%s", Sep, st.Interval)
 }
 
 // RunOnceTrigger implements the quartz.Trigger interface.
@@ -78,5 +78,5 @@ func (ot *RunOnceTrigger) Description() string {
 		status = "expired"
 	}
 
-	return fmt.Sprintf("RunOnceTrigger (%s).", status)
+	return fmt.Sprintf("RunOnceTrigger%s%s%s%s", Sep, ot.Delay, Sep, status)
 }
