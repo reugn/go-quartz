@@ -36,7 +36,7 @@ func NewJobKeyWithGroup(name, group string) *JobKey {
 
 // String returns string representation of the JobKey.
 func (jobKey *JobKey) String() string {
-	return fmt.Sprintf("%s::%s", jobKey.group, jobKey.name)
+	return fmt.Sprintf("%s%s%s", jobKey.group, Sep, jobKey.name)
 }
 
 // Equals indicates whether some other JobKey is "equal to" this one.

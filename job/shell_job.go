@@ -44,7 +44,7 @@ func NewShellJobWithCallback(cmd string, f func(context.Context, *ShellJob)) *Sh
 
 // Description returns the description of the ShellJob.
 func (sh *ShellJob) Description() string {
-	return fmt.Sprintf("ShellJob: %s", sh.cmd)
+	return fmt.Sprintf("ShellJob%s%s", quartz.Sep, sh.cmd)
 }
 
 var (

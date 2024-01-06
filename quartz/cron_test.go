@@ -14,7 +14,6 @@ func TestCronExpression1(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
 	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("10/20 15 14 5-10 * ? *")
-	cronTrigger.Description()
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -357,6 +356,13 @@ func TestCronHourly(t *testing.T) {
 func TestCronExpressionInvalidLength(t *testing.T) {
 	_, err := quartz.NewCronTrigger("0 0 0 * *")
 	assert.Equal(t, err.Error(), "invalid cron expression: invalid expression length")
+}
+
+func TestCronExpressionDescription(t *testing.T) {
+	expression := "0 0 0 29 2 ?"
+	cronTrigger, err := quartz.NewCronTrigger(expression)
+	assert.Equal(t, err, nil)
+	assert.Equal(t, cronTrigger.Description(), fmt.Sprintf("CronTrigger::%s::UTC", expression))
 }
 
 var readDateLayout = "Mon Jan 2 15:04:05 2006"

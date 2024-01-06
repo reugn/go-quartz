@@ -38,13 +38,13 @@ type CronTrigger struct {
 var _ Trigger = (*CronTrigger)(nil)
 
 // NewCronTrigger returns a new CronTrigger using the UTC location.
-func NewCronTrigger(expr string) (*CronTrigger, error) {
-	return NewCronTriggerWithLoc(expr, time.UTC)
+func NewCronTrigger(expression string) (*CronTrigger, error) {
+	return NewCronTriggerWithLoc(expression, time.UTC)
 }
 
 // NewCronTriggerWithLoc returns a new CronTrigger with the given time.Location.
-func NewCronTriggerWithLoc(expr string, location *time.Location) (*CronTrigger, error) {
-	fields, err := validateCronExpression(expr)
+func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTrigger, error) {
+	fields, err := validateCronExpression(expression)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func NewCronTriggerWithLoc(expr string, location *time.Location) (*CronTrigger, 
 	}
 
 	return &CronTrigger{
-		expression:  expr,
+		expression:  expression,
 		fields:      fields,
 		lastDefined: lastDefined,
 		location:    location,
@@ -78,7 +78,7 @@ func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 
 // Description returns the description of the trigger.
 func (ct *CronTrigger) Description() string {
-	return fmt.Sprintf("CronTrigger %s", ct.expression)
+	return fmt.Sprintf("CronTrigger%s%s%s%s", Sep, ct.expression, Sep, ct.location)
 }
 
 // cronExpressionParser parses cron expressions.

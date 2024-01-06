@@ -29,7 +29,7 @@ var _ quartz.Job = (*FunctionJob[any])(nil)
 func NewFunctionJob[R any](function Function[R]) *FunctionJob[R] {
 	return &FunctionJob[R]{
 		function:  &function,
-		desc:      fmt.Sprintf("FunctionJob:%p", &function),
+		desc:      fmt.Sprintf("FunctionJob%s%p", quartz.Sep, &function),
 		jobStatus: StatusNA,
 	}
 }

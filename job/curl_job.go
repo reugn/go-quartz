@@ -60,7 +60,7 @@ func NewCurlJobWithOptions(request *http.Request, opts CurlJobOptions) *CurlJob 
 
 // Description returns the description of the CurlJob.
 func (cu *CurlJob) Description() string {
-	return fmt.Sprintf("CurlJob:\n%s", cu.description)
+	return fmt.Sprintf("CurlJob%s%s", quartz.Sep, cu.description)
 }
 
 // DumpResponse returns the response of the job in its HTTP/1.x wire

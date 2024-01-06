@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// Sep is the serialization delimiter; the default is a double colon.
+var Sep = "::"
+
 func indexes(search []string, target []string) ([]int, error) {
 	searchIndexes := make([]int, 0, len(search))
 	for _, a := range search {
