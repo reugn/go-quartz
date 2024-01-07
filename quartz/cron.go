@@ -44,6 +44,10 @@ func NewCronTrigger(expression string) (*CronTrigger, error) {
 
 // NewCronTriggerWithLoc returns a new CronTrigger with the given time.Location.
 func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTrigger, error) {
+	if location == nil {
+		return nil, errors.New("location is nil")
+	}
+
 	fields, err := validateCronExpression(expression)
 	if err != nil {
 		return nil, err
