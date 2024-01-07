@@ -358,6 +358,11 @@ func TestCronExpressionInvalidLength(t *testing.T) {
 	assert.Equal(t, err.Error(), "invalid cron expression: invalid expression length")
 }
 
+func TestCronTriggerNilLocationError(t *testing.T) {
+	_, err := quartz.NewCronTriggerWithLoc("@daily", nil)
+	assert.Equal(t, err.Error(), "location is nil")
+}
+
 func TestCronExpressionDescription(t *testing.T) {
 	expression := "0 0 0 29 2 ?"
 	cronTrigger, err := quartz.NewCronTrigger(expression)
