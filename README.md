@@ -81,18 +81,14 @@ Any type that implements it can be scheduled.
 ```go
 type Job interface {
 	// Execute is called by a Scheduler when the Trigger associated with this job fires.
-	Execute(context.Context)
+	Execute(context.Context) error
 
 	// Description returns the description of the Job.
 	Description() string
 }
 ```
 
-Implemented Jobs
-
-- ShellJob
-- CurlJob
-- FunctionJob
+Several common Job implementations can be found in the [job](./job) package.
 
 ## Cron expression format
 
