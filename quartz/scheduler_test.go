@@ -300,7 +300,7 @@ func TestSchedulerJobWithRetries(t *testing.T) {
 	sched := quartz.NewStdScheduler()
 	opts := quartz.NewDefaultJobDetailOptions()
 	opts.MaxRetries = 3
-	opts.RetryInterval = 100 * time.Millisecond
+	opts.RetryInterval = 50 * time.Millisecond
 	jobDetail := quartz.NewJobDetailWithOptions(
 		funcRetryJob,
 		quartz.NewJobKey("funcRetryJob"),
@@ -309,14 +309,67 @@ func TestSchedulerJobWithRetries(t *testing.T) {
 	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.Equal(t, err, nil)
 
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusNA)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
+
 	sched.Start(ctx)
-	sched.Start(ctx)
+
+	time.Sleep(25 * time.Millisecond)
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 1)
+
 	time.Sleep(50 * time.Millisecond)
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
-	time.Sleep(100 * time.Millisecond)
-	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 2)
+
 	time.Sleep(100 * time.Millisecond)
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusOK)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 3)
+
+	sched.Stop()
+}
+
+func TestSchedulerJobWithRetriesCtxDone(t *testing.T) {
+	var n int32
+	funcRetryJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
+		atomic.AddInt32(&n, 1)
+		if n < 3 {
+			return "", errors.New("less than 3")
+		}
+		return "ok", nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	sched := quartz.NewStdScheduler()
+	opts := quartz.NewDefaultJobDetailOptions()
+	opts.MaxRetries = 3
+	opts.RetryInterval = 50 * time.Millisecond
+	jobDetail := quartz.NewJobDetailWithOptions(
+		funcRetryJob,
+		quartz.NewJobKey("funcRetryJob"),
+		opts,
+	)
+	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
+	assert.Equal(t, err, nil)
+
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusNA)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
+
+	sched.Start(ctx)
+
+	time.Sleep(25 * time.Millisecond)
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 1)
+
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 2)
+
+	cancel() // cancel the context after first retry
+
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 2)
+
 	sched.Stop()
 }
 
@@ -343,4 +396,16 @@ func TestSchedulerArgumentValidationErrors(t *testing.T) {
 
 	_, err = sched.GetScheduledJob(nil)
 	assert.Equal(t, err.Error(), "jobKey is nil")
+}
+
+func TestSchedulerStartStop(t *testing.T) {
+	sched := quartz.NewStdScheduler()
+	ctx := context.Background()
+	sched.Start(ctx)
+	sched.Start(ctx)
+	assert.Equal(t, sched.IsStarted(), true)
+
+	sched.Stop()
+	sched.Stop()
+	assert.Equal(t, sched.IsStarted(), false)
 }
