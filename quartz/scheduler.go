@@ -404,13 +404,14 @@ func executeWithRetries(ctx context.Context, jobDetail *JobDetail) {
 	if err == nil {
 		return
 	}
-	for i := 0; i < jobDetail.opts.MaxRetries; i++ {
+retryLoop:
+	for i := 1; i <= jobDetail.opts.MaxRetries; i++ {
 		timer := time.NewTimer(jobDetail.opts.RetryInterval)
 		select {
 		case <-timer.C:
 		case <-ctx.Done():
 			timer.Stop()
-			break
+			break retryLoop
 		}
 		logger.Tracef("Job %s retry %d", jobDetail.jobKey, i)
 		err = jobDetail.job.Execute(ctx)
