@@ -174,7 +174,7 @@ func (jq *jobQueue) Remove(jobKey *JobKey) (ScheduledJob, error) {
 			return heap.Remove(&jq.delegate, i).(ScheduledJob), nil
 		}
 	}
-	return nil, errors.New("no job with the given key found")
+	return nil, jobNotFoundError(fmt.Sprintf("for key %s", jobKey))
 }
 
 // ScheduledJobs returns the slice of all scheduled jobs in the queue.

@@ -15,7 +15,7 @@ func indexes(search []string, target []string) ([]int, error) {
 	for _, a := range search {
 		index := intVal(target, a)
 		if index == -1 {
-			return nil, fmt.Errorf("invalid cron field: %s", a)
+			return nil, cronParseError(fmt.Sprintf("invalid cron field %s", a))
 		}
 		searchIndexes = append(searchIndexes, index)
 	}
@@ -50,34 +50,32 @@ func sliceAtoi(sa []string) ([]int, error) {
 	return si, nil
 }
 
-func fillRange(from, to int) ([]int, error) {
+func fillRangeValues(from, to int) ([]int, error) {
 	if to < from {
-		return nil, cronError("fillRange")
+		return nil, cronParseError("fill range values")
 	}
-
 	length := (to - from) + 1
-	arr := make([]int, length)
+	rangeValues := make([]int, length)
 
 	for i, j := from, 0; i <= to; i, j = i+1, j+1 {
-		arr[j] = i
+		rangeValues[j] = i
 	}
 
-	return arr, nil
+	return rangeValues, nil
 }
 
-func fillStep(from, step, max int) ([]int, error) {
+func fillStepValues(from, step, max int) ([]int, error) {
 	if max < from || step == 0 {
-		return nil, cronError("fillStep")
+		return nil, cronParseError("fill step values")
 	}
-
 	length := ((max - from) / step) + 1
-	arr := make([]int, length)
+	stepValues := make([]int, length)
 
 	for i, j := from, 0; i <= max; i, j = i+step, j+1 {
-		arr[j] = i
+		stepValues[j] = i
 	}
 
-	return arr, nil
+	return stepValues, nil
 }
 
 func normalize(field string, dict []string) int {
@@ -97,10 +95,6 @@ func inScope(i, min, max int) bool {
 	return false
 }
 
-func cronError(cause string) error {
-	return fmt.Errorf("invalid cron expression: %s", cause)
-}
-
 func intVal(target []string, search string) int {
 	uSearch := strings.ToUpper(search)
 	for i, v := range target {
@@ -118,7 +112,7 @@ func atoi(str string) int {
 	return i
 }
 
-// NowNano returns the current UTC Unix time in nanoseconds.
+// NowNano returns the current Unix time in nanoseconds.
 func NowNano() int64 {
-	return time.Now().UTC().UnixNano()
+	return time.Now().UnixNano()
 }

@@ -68,7 +68,7 @@ func TestScheduler(t *testing.T) {
 
 	nonExistentJobKey := quartz.NewJobKey("NA")
 	_, err = sched.GetScheduledJob(nonExistentJobKey)
-	assert.NotEqual(t, err, nil)
+	assert.ErrorContains(t, err, quartz.ErrJobNotFound.Error())
 
 	err = sched.DeleteJob(nonExistentJobKey)
 	assert.NotEqual(t, err, nil)
@@ -381,21 +381,21 @@ func TestSchedulerArgumentValidationErrors(t *testing.T) {
 	assert.Equal(t, err, nil)
 
 	err = sched.ScheduleJob(nil, trigger)
-	assert.Equal(t, err.Error(), "jobDetail is nil")
+	assert.ErrorContains(t, err, "jobDetail is nil")
 	err = sched.ScheduleJob(quartz.NewJobDetail(job, nil), trigger)
-	assert.Equal(t, err.Error(), "jobDetail.jobKey is nil")
+	assert.ErrorContains(t, err, "jobDetail.jobKey is nil")
 	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKey("")), trigger)
-	assert.Equal(t, err.Error(), "empty key name is not allowed")
+	assert.ErrorContains(t, err, "empty key name is not allowed")
 	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKeyWithGroup("job", "")), nil)
-	assert.Equal(t, err.Error(), "trigger is nil")
+	assert.ErrorContains(t, err, "trigger is nil")
 	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKey("job")), expiredTrigger)
-	assert.Equal(t, err.Error(), "next trigger time is in the past")
+	assert.ErrorContains(t, err, "next trigger time is in the past")
 
 	err = sched.DeleteJob(nil)
-	assert.Equal(t, err.Error(), "jobKey is nil")
+	assert.ErrorContains(t, err, "jobKey is nil")
 
 	_, err = sched.GetScheduledJob(nil)
-	assert.Equal(t, err.Error(), "jobKey is nil")
+	assert.ErrorContains(t, err, "jobKey is nil")
 }
 
 func TestSchedulerStartStop(t *testing.T) {
