@@ -2,7 +2,7 @@ package quartz
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -136,16 +136,16 @@ func (sched *StdScheduler) ScheduleJob(
 	trigger Trigger,
 ) error {
 	if jobDetail == nil {
-		return errors.New("jobDetail is nil")
+		return illegalArgumentError("jobDetail is nil")
 	}
 	if jobDetail.jobKey == nil {
-		return errors.New("jobDetail.jobKey is nil")
+		return illegalArgumentError("jobDetail.jobKey is nil")
 	}
 	if jobDetail.jobKey.name == "" {
-		return errors.New("empty key name is not allowed")
+		return illegalArgumentError("empty key name is not allowed")
 	}
 	if trigger == nil {
-		return errors.New("trigger is nil")
+		return illegalArgumentError("trigger is nil")
 	}
 	nextRunTime, err := trigger.NextFireTime(NowNano())
 	if err != nil {
@@ -224,7 +224,7 @@ func (sched *StdScheduler) GetJobKeys() []*JobKey {
 // GetScheduledJob returns the ScheduledJob with the specified key.
 func (sched *StdScheduler) GetScheduledJob(jobKey *JobKey) (ScheduledJob, error) {
 	if jobKey == nil {
-		return nil, errors.New("jobKey is nil")
+		return nil, illegalArgumentError("jobKey is nil")
 	}
 	scheduledJobs := sched.queue.ScheduledJobs()
 	for _, scheduled := range scheduledJobs {
@@ -232,13 +232,13 @@ func (sched *StdScheduler) GetScheduledJob(jobKey *JobKey) (ScheduledJob, error)
 			return scheduled, nil
 		}
 	}
-	return nil, errors.New("no job with the given key found")
+	return nil, jobNotFoundError(fmt.Sprintf("for key %s", jobKey))
 }
 
 // DeleteJob removes the Job with the specified key if present.
 func (sched *StdScheduler) DeleteJob(jobKey *JobKey) error {
 	if jobKey == nil {
-		return errors.New("jobKey is nil")
+		return illegalArgumentError("jobKey is nil")
 	}
 	_, err := sched.queue.Remove(jobKey)
 	if err == nil {

@@ -45,7 +45,7 @@ func NewCronTrigger(expression string) (*CronTrigger, error) {
 // NewCronTriggerWithLoc returns a new CronTrigger with the given time.Location.
 func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTrigger, error) {
 	if location == nil {
-		return nil, errors.New("location is nil")
+		return nil, illegalArgumentError("location is nil")
 	}
 
 	fields, err := validateCronExpression(expression)
@@ -62,7 +62,7 @@ func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTri
 
 	// full wildcard expression
 	if lastDefined == -1 {
-		fields[0].values, _ = fillRange(0, 59)
+		fields[0].values, _ = fillRangeValues(0, 59)
 	}
 
 	return &CronTrigger{
@@ -158,13 +158,13 @@ func validateCronExpression(expression string) ([]*cronField, error) {
 	}
 	length := len(tokens)
 	if length < 6 || length > 7 {
-		return nil, cronError("invalid expression length")
+		return nil, cronParseError("invalid expression length")
 	}
 	if length == 6 {
 		tokens = append(tokens, "*")
 	}
 	if (tokens[3] != "?" && tokens[3] != "*") && (tokens[5] != "?" && tokens[5] != "*") {
-		return nil, cronError("day field was set twice")
+		return nil, cronParseError("day field set twice")
 	}
 
 	return buildCronField(tokens)
@@ -223,13 +223,13 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 		return &cronField{[]int{}}, nil
 	}
 
-	// single value
+	// simple value
 	i, err := strconv.Atoi(field)
 	if err == nil {
 		if inScope(i, min, max) {
 			return &cronField{[]int{i}}, nil
 		}
-		return nil, cronError("single min/max validation error")
+		return nil, cronParseError("simple field min/max validation")
 	}
 
 	// list values
@@ -247,18 +247,18 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 		return parseStepField(field, min, max, dict)
 	}
 
-	// literal single value
+	// simple literal value
 	if dict != nil {
 		i := intVal(dict, field)
 		if i >= 0 {
 			if inScope(i, min, max) {
 				return &cronField{[]int{i}}, nil
 			}
-			return nil, cronError("cron literal min/max validation error")
+			return nil, cronParseError("simple literal min/max validation")
 		}
 	}
 
-	return nil, cronError("cron parse error")
+	return nil, cronParseError("parse error")
 }
 
 func parseListField(field string, min, max int, translate []string) (*cronField, error) {
@@ -286,17 +286,16 @@ func parseListField(field string, min, max int, translate []string) (*cronField,
 func parseRangeField(field string, min, max int, translate []string) (*cronField, error) {
 	t := strings.Split(field, "-")
 	if len(t) != 2 {
-		return nil, cronError("parse cron range error")
+		return nil, cronParseError(fmt.Sprintf("invalid range field %s", field))
 	}
 
 	from := normalize(t[0], translate)
 	to := normalize(t[1], translate)
 	if !inScope(from, min, max) || !inScope(to, min, max) {
-		return nil, cronError(fmt.Sprintf("cron range min/max validation error %d-%d",
-			from, to))
+		return nil, cronParseError(fmt.Sprintf("range field min/max validation %d-%d", from, to))
 	}
 
-	rangeValues, err := fillRange(from, to)
+	rangeValues, err := fillRangeValues(from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +306,7 @@ func parseRangeField(field string, min, max int, translate []string) (*cronField
 func parseStepField(field string, min, max int, translate []string) (*cronField, error) {
 	t := strings.Split(field, "/")
 	if len(t) != 2 {
-		return nil, cronError("parse cron step error")
+		return nil, cronParseError(fmt.Sprintf("invalid step field %s", field))
 	}
 
 	if t[0] == "*" {
@@ -317,10 +316,10 @@ func parseStepField(field string, min, max int, translate []string) (*cronField,
 	from := normalize(t[0], translate)
 	step := atoi(t[1])
 	if !inScope(from, min, max) {
-		return nil, cronError("cron step min/max validation error")
+		return nil, cronParseError("step field min/max validation")
 	}
 
-	stepValues, err := fillStep(from, step, max)
+	stepValues, err := fillStepValues(from, step, max)
 	if err != nil {
 		return nil, err
 	}
