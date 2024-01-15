@@ -370,6 +370,11 @@ func TestCronExpressionDescription(t *testing.T) {
 	assert.Equal(t, cronTrigger.Description(), fmt.Sprintf("CronTrigger::%s::UTC", expression))
 }
 
+func TestValidateCronExpression(t *testing.T) {
+	assert.Equal(t, quartz.ValidateCronExpression("@monthly"), nil)
+	assert.NotEqual(t, quartz.ValidateCronExpression(""), nil)
+}
+
 var readDateLayout = "Mon Jan 2 15:04:05 2006"
 
 func iterate(prev int64, cronTrigger *quartz.CronTrigger, iterations int) (string, error) {

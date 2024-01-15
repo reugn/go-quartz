@@ -48,7 +48,7 @@ func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTri
 		return nil, illegalArgumentError("location is nil")
 	}
 
-	fields, err := validateCronExpression(expression)
+	fields, err := parseCronExpression(expression)
 	if err != nil {
 		return nil, err
 	}
@@ -75,53 +75,30 @@ func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTri
 
 // NextFireTime returns the next time at which the CronTrigger is scheduled to fire.
 func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
-	parser := newCronExpressionParser(ct.lastDefined)
 	prevTime := time.Unix(prev/int64(time.Second), 0).In(ct.location)
-	return parser.nextTime(prevTime, ct.fields)
+	// build a CronStateMachine and run once
+	csm := makeCSMFromFields(prevTime, ct.fields)
+	nextDateTime := csm.NextTriggerTime(prevTime.Location())
+	if nextDateTime.Before(prevTime) || nextDateTime.Equal(prevTime) {
+		return 0, errors.New("next trigger time is in the past")
+	}
+	return nextDateTime.UnixNano(), nil
 }
 
-// Description returns the description of the trigger.
+// Description returns the description of the cron trigger.
 func (ct *CronTrigger) Description() string {
 	return fmt.Sprintf("CronTrigger%s%s%s%s", Sep, ct.expression, Sep, ct.location)
 }
 
-// cronExpressionParser parses cron expressions.
-type cronExpressionParser struct {
-	minuteBump bool
-	hourBump   bool
-	dayBump    bool
-	monthBump  bool
-	yearBump   bool
-	done       bool
-
-	lastDefined int
-	maxDays     int
-}
-
-// newCronExpressionParser returns a new cronExpressionParser.
-func newCronExpressionParser(lastDefined int) *cronExpressionParser {
-	return &cronExpressionParser{false, false, false, false, false, false,
-		lastDefined, 0}
-}
-
-// cronField represents a parsed cron expression as an array.
+// cronField represents a parsed cron expression field.
 type cronField struct {
 	values []int
 }
 
-// isEmpty checks if the cronField values array is empty.
-func (cf *cronField) isEmpty() bool {
-	return len(cf.values) == 0
-}
-
-// incr increments each element of the underlying array by the given value.
-func (cf *cronField) incr(a int) {
-	if !cf.isEmpty() {
-		mapped := make([]int, len(cf.values))
-		for i, v := range cf.values {
-			mapped[i] = v + a
-		}
-		cf.values = mapped
+// add increments each element of the underlying array by the given delta.
+func (cf *cronField) add(delta int) {
+	for i := range cf.values {
+		cf.values[i] += delta
 	}
 }
 
@@ -144,11 +121,20 @@ var (
 	}
 )
 
-// <second> <minute> <hour> <day-of-month> <month> <day-of-week> <year>
-// <year> field is optional
+// ValidateCronExpression validates a cron expression string.
+// A valid expression consists of the following fields:
+//
+//	<second> <minute> <hour> <day-of-month> <month> <day-of-week> <year>
+//
+// where the <year> field is optional.
+// See the cron expression format table in the readme file for supported special characters.
+func ValidateCronExpression(expression string) error {
+	_, err := parseCronExpression(expression)
+	return err
+}
 
-// the ? wildcard is only used in the day of month and day of week fields
-func validateCronExpression(expression string) ([]*cronField, error) {
+// parseCronExpression parses a cron expression string.
+func parseCronExpression(expression string) ([]*cronField, error) {
 	var tokens []string
 
 	if value, ok := special[expression]; ok {
@@ -202,7 +188,7 @@ func buildCronField(tokens []string) ([]*cronField, error) {
 	if err != nil {
 		return nil, err
 	}
-	fields[5].incr(-1)
+	fields[5].add(-1)
 
 	fields[6], err = parseField(tokens[6], 1970, 1970*2)
 	if err != nil {
@@ -325,14 +311,4 @@ func parseStepField(field string, min, max int, translate []string) (*cronField,
 	}
 
 	return &cronField{stepValues}, nil
-}
-
-func (parser *cronExpressionParser) nextTime(prev time.Time, fields []*cronField) (int64, error) {
-	// Build CronStateMachine and run once
-	csm := makeCSMFromFields(prev, fields)
-	nextDateTime := csm.NextTriggerTime(prev.Location())
-	if nextDateTime.Before(prev) || nextDateTime.Equal(prev) {
-		return 0, errors.New("next trigger time is in the past")
-	}
-	return nextDateTime.UnixNano(), nil
 }
