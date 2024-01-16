@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -34,7 +35,7 @@ func NewSimpleLogger(logger *log.Logger, level Level) *SimpleLogger {
 func (l *SimpleLogger) Trace(msg any) {
 	if l.Enabled(LevelTrace) {
 		l.logger.SetPrefix(TracePrefix)
-		l.logger.Println(msg)
+		l.logger.Output(3, fmt.Sprint(msg))
 	}
 }
 
@@ -43,7 +44,7 @@ func (l *SimpleLogger) Trace(msg any) {
 func (l *SimpleLogger) Tracef(format string, args ...any) {
 	if l.Enabled(LevelTrace) {
 		l.logger.SetPrefix(TracePrefix)
-		l.logger.Printf(format, args...)
+		l.logger.Output(3, fmt.Sprintf(format, args...))
 	}
 }
 
@@ -52,7 +53,7 @@ func (l *SimpleLogger) Tracef(format string, args ...any) {
 func (l *SimpleLogger) Debug(msg any) {
 	if l.Enabled(LevelDebug) {
 		l.logger.SetPrefix(DebugPrefix)
-		l.logger.Println(msg)
+		l.logger.Output(3, fmt.Sprint(msg))
 	}
 }
 
@@ -61,7 +62,7 @@ func (l *SimpleLogger) Debug(msg any) {
 func (l *SimpleLogger) Debugf(format string, args ...any) {
 	if l.Enabled(LevelDebug) {
 		l.logger.SetPrefix(DebugPrefix)
-		l.logger.Printf(format, args...)
+		l.logger.Output(3, fmt.Sprintf(format, args...))
 	}
 }
 
@@ -70,7 +71,7 @@ func (l *SimpleLogger) Debugf(format string, args ...any) {
 func (l *SimpleLogger) Info(msg any) {
 	if l.Enabled(LevelInfo) {
 		l.logger.SetPrefix(InfoPrefix)
-		l.logger.Println(msg)
+		l.logger.Output(3, fmt.Sprint(msg))
 	}
 }
 
@@ -79,7 +80,7 @@ func (l *SimpleLogger) Info(msg any) {
 func (l *SimpleLogger) Infof(format string, args ...any) {
 	if l.Enabled(LevelInfo) {
 		l.logger.SetPrefix(InfoPrefix)
-		l.logger.Printf(format, args...)
+		l.logger.Output(3, fmt.Sprintf(format, args...))
 	}
 }
 
@@ -88,7 +89,7 @@ func (l *SimpleLogger) Infof(format string, args ...any) {
 func (l *SimpleLogger) Warn(msg any) {
 	if l.Enabled(LevelWarn) {
 		l.logger.SetPrefix(WarnPrefix)
-		l.logger.Println(msg)
+		l.logger.Output(3, fmt.Sprint(msg))
 	}
 }
 
@@ -97,7 +98,7 @@ func (l *SimpleLogger) Warn(msg any) {
 func (l *SimpleLogger) Warnf(format string, args ...any) {
 	if l.Enabled(LevelWarn) {
 		l.logger.SetPrefix(WarnPrefix)
-		l.logger.Printf(format, args...)
+		l.logger.Output(3, fmt.Sprintf(format, args...))
 	}
 }
 
@@ -106,7 +107,7 @@ func (l *SimpleLogger) Warnf(format string, args ...any) {
 func (l *SimpleLogger) Error(msg any) {
 	if l.Enabled(LevelError) {
 		l.logger.SetPrefix(ErrorPrefix)
-		l.logger.Println(msg)
+		l.logger.Output(3, fmt.Sprint(msg))
 	}
 }
 
@@ -115,7 +116,7 @@ func (l *SimpleLogger) Error(msg any) {
 func (l *SimpleLogger) Errorf(format string, args ...any) {
 	if l.Enabled(LevelError) {
 		l.logger.SetPrefix(ErrorPrefix)
-		l.logger.Printf(format, args...)
+		l.logger.Output(3, fmt.Sprintf(format, args...))
 	}
 }
 
