@@ -19,7 +19,6 @@ func indexes(search []string, target []string) ([]int, error) {
 		}
 		searchIndexes = append(searchIndexes, index)
 	}
-
 	return searchIndexes, nil
 }
 
@@ -43,10 +42,8 @@ func sliceAtoi(sa []string) ([]int, error) {
 		if err != nil {
 			return si, err
 		}
-
 		si = append(si, i)
 	}
-
 	return si, nil
 }
 
@@ -60,7 +57,6 @@ func fillRangeValues(from, to int) ([]int, error) {
 	for i, j := from, 0; i <= to; i, j = i+1, j+1 {
 		rangeValues[j] = i
 	}
-
 	return rangeValues, nil
 }
 
@@ -74,7 +70,6 @@ func fillStepValues(from, step, max int) ([]int, error) {
 	for i, j := from, 0; i <= max; i, j = i+step, j+1 {
 		stepValues[j] = i
 	}
-
 	return stepValues, nil
 }
 
@@ -83,7 +78,6 @@ func normalize(field string, dict []string) int {
 	if err == nil {
 		return i
 	}
-
 	return intVal(dict, field)
 }
 
@@ -91,18 +85,16 @@ func inScope(i, min, max int) bool {
 	if i >= min && i <= max {
 		return true
 	}
-
 	return false
 }
 
-func intVal(target []string, search string) int {
-	uSearch := strings.ToUpper(search)
-	for i, v := range target {
-		if v == uSearch {
+func intVal(source []string, target string) int {
+	upperCaseTarget := strings.ToUpper(target)
+	for i, v := range source {
+		if v == upperCaseTarget {
 			return i
 		}
 	}
-
 	return -1 // TODO: return error
 }
 

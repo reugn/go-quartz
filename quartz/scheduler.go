@@ -336,14 +336,13 @@ func (sched *StdScheduler) calculateNextTick() time.Duration {
 			logger.Warnf("Failed to calculate next tick for %s, err: %s",
 				scheduledJob.JobDetail().jobKey, err)
 		} else {
-			var nextTick int64
+			var nextTickDuration time.Duration
 			nextRunTime := scheduledJob.NextRunTime()
 			now := NowNano()
 			if nextRunTime > now {
-				nextTick = nextRunTime - now
+				nextTickDuration = time.Duration(nextRunTime - now)
 			}
-			nextTickDuration := time.Duration(nextTick)
-			logger.Debugf("Next tick for %s in %s.", scheduledJob.JobDetail().jobKey,
+			logger.Tracef("Next tick is for %s in %s.", scheduledJob.JobDetail().jobKey,
 				nextTickDuration)
 			return nextTickDuration
 		}
@@ -364,18 +363,15 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 		logger.Errorf("Failed to fetch a job from the queue: %s", err)
 		return
 	}
-	// try rescheduling the job immediately
-	sched.rescheduleJob(ctx, scheduled)
 
-	now := NowNano()
-	// check if the job is due to be processed
-	if scheduled.NextRunTime() > now {
-		logger.Tracef("Job %s is not due to run yet.", scheduled.JobDetail().jobKey)
-		return
-	}
+	// validate the job
+	valid, nextRunTimeExtractor := sched.validateJob(scheduled)
+
+	// try rescheduling the job immediately
+	sched.rescheduleJob(ctx, scheduled, nextRunTimeExtractor)
 
 	// execute the job
-	if sched.jobIsUpToDate(scheduled, now) {
+	if valid {
 		logger.Debugf("Job %s is about to be executed.", scheduled.JobDetail().jobKey)
 		switch {
 		case sched.opts.BlockingExecution:
@@ -393,9 +389,6 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 				executeWithRetries(ctx, scheduled.JobDetail())
 			}()
 		}
-	} else {
-		logger.Debugf("Job %s skipped as outdated %s.", scheduled.JobDetail().jobKey,
-			time.Duration(now-scheduled.NextRunTime()))
 	}
 }
 
@@ -424,13 +417,26 @@ retryLoop:
 	}
 }
 
-func (sched *StdScheduler) rescheduleJob(ctx context.Context, job ScheduledJob) {
-	nextRunTime, err := job.Trigger().NextFireTime(job.NextRunTime())
+func (sched *StdScheduler) validateJob(job ScheduledJob) (bool, func() (int64, error)) {
+	now := NowNano()
+	if job.NextRunTime() < now-sched.opts.OutdatedThreshold.Nanoseconds() {
+		duration := time.Duration(now - job.NextRunTime())
+		logger.Debugf("Job %s skipped as outdated %s.", job.JobDetail().jobKey, duration)
+		return false, func() (int64, error) { return job.Trigger().NextFireTime(now) }
+	} else if job.NextRunTime() > now {
+		logger.Debugf("Job %s is not due to run yet.", job.JobDetail().jobKey)
+		return false, func() (int64, error) { return job.NextRunTime(), nil }
+	}
+	return true, func() (int64, error) { return job.Trigger().NextFireTime(job.NextRunTime()) }
+}
+
+func (sched *StdScheduler) rescheduleJob(ctx context.Context, job ScheduledJob,
+	nextRunTimeExtractor func() (int64, error)) {
+	nextRunTime, err := nextRunTimeExtractor()
 	if err != nil {
 		logger.Infof("Job %s exited the execution loop: %s.", job.JobDetail().jobKey, err)
 		return
 	}
-
 	select {
 	case <-ctx.Done():
 	case sched.feeder <- &scheduledJob{
@@ -439,10 +445,6 @@ func (sched *StdScheduler) rescheduleJob(ctx context.Context, job ScheduledJob) 
 		priority: nextRunTime,
 	}:
 	}
-}
-
-func (sched *StdScheduler) jobIsUpToDate(job ScheduledJob, now int64) bool {
-	return job.NextRunTime() > now-sched.opts.OutdatedThreshold.Nanoseconds()
 }
 
 func (sched *StdScheduler) startFeedReader(ctx context.Context) {

@@ -192,7 +192,6 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestSchedulerCancel(t *testing.T) {
