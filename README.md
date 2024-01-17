@@ -104,7 +104,9 @@ Several common Job implementations can be found in the [job](./job) package.
 
 ## Distributed mode
 
-The scheduler can use its own implementation of `quartz.JobQueue` to allow state sharing.
+The scheduler can use its own implementation of `quartz.JobQueue` to allow state sharing.  
+An example implementation of the job queue using the file system as a persistence layer
+can be found [here](./examples/queue/file_system.go).
 
 ## Logger
 
