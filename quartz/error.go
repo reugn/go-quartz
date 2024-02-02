@@ -8,6 +8,7 @@ import (
 // Errors
 var (
 	ErrIllegalArgument = errors.New("illegal argument")
+	ErrIllegalState    = errors.New("illegal state")
 	ErrCronParse       = errors.New("parse cron expression")
 	ErrJobNotFound     = errors.New("job not found")
 )
@@ -16,6 +17,12 @@ var (
 // error message, which unwraps to ErrIllegalArgument.
 func illegalArgumentError(message string) error {
 	return fmt.Errorf("%w: %s", ErrIllegalArgument, message)
+}
+
+// illegalStateError returns an illegal state error with a custom
+// error message, which unwraps to ErrIllegalState.
+func illegalStateError(message string) error {
+	return fmt.Errorf("%w: %s", ErrIllegalState, message)
 }
 
 // cronParseError returns a cron parse error with a custom error message,

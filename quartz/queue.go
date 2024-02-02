@@ -52,6 +52,10 @@ type JobQueue interface {
 	// Head returns the first scheduled job without removing it from the queue.
 	Head() (ScheduledJob, error)
 
+	// Get returns the scheduled job with the specified key without removing it
+	// from the queue.
+	Get(jobKey *JobKey) (ScheduledJob, error)
+
 	// Remove removes and returns the scheduled job with the specified key.
 	Remove(jobKey *JobKey) (ScheduledJob, error)
 
@@ -136,8 +140,8 @@ func (jq *jobQueue) Push(job ScheduledJob) error {
 				heap.Remove(&jq.delegate, i)
 				break
 			}
-			return fmt.Errorf("job with the key %s already exists",
-				job.JobDetail().jobKey)
+			return illegalStateError(fmt.Sprintf("job with the key %s already exists",
+				job.JobDetail().jobKey))
 		}
 	}
 	heap.Push(&jq.delegate, job)
@@ -164,6 +168,19 @@ func (jq *jobQueue) Head() (ScheduledJob, error) {
 	return jq.delegate[0], nil
 }
 
+// Get returns the scheduled job with the specified key without removing it
+// from the queue.
+func (jq *jobQueue) Get(jobKey *JobKey) (ScheduledJob, error) {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
+	for _, scheduled := range jq.delegate {
+		if scheduled.JobDetail().jobKey.Equals(jobKey) {
+			return scheduled, nil
+		}
+	}
+	return nil, jobNotFoundError(jobKey.String())
+}
+
 // Remove removes and returns the scheduled job with the specified key.
 func (jq *jobQueue) Remove(jobKey *JobKey) (ScheduledJob, error) {
 	jq.mtx.Lock()
@@ -174,7 +191,7 @@ func (jq *jobQueue) Remove(jobKey *JobKey) (ScheduledJob, error) {
 			return heap.Remove(&jq.delegate, i).(ScheduledJob), nil
 		}
 	}
-	return nil, jobNotFoundError(fmt.Sprintf("for key %s", jobKey))
+	return nil, jobNotFoundError(jobKey.String())
 }
 
 // ScheduledJobs returns the slice of all scheduled jobs in the queue.
