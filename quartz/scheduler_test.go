@@ -88,7 +88,7 @@ func TestScheduler(t *testing.T) {
 	assert.Equal(t, errCurlJob.JobStatus(), job.StatusFailure)
 }
 
-func TestSchedulerBlockingSemantics(t *testing.T) {
+func TestScheduler_BlockingSemantics(t *testing.T) {
 	for _, tt := range []string{"Blocking", "NonBlocking", "WorkerSmall", "WorkerLarge"} {
 		t.Run(tt, func(t *testing.T) {
 			var opts quartz.StdSchedulerOptions
@@ -194,7 +194,7 @@ func TestSchedulerBlockingSemantics(t *testing.T) {
 	}
 }
 
-func TestSchedulerCancel(t *testing.T) {
+func TestScheduler_Cancel(t *testing.T) {
 	hourJob := func(ctx context.Context) (bool, error) {
 		timer := time.NewTimer(time.Hour)
 		defer timer.Stop()
@@ -286,7 +286,7 @@ func TestSchedulerCancel(t *testing.T) {
 	}
 }
 
-func TestSchedulerJobWithRetries(t *testing.T) {
+func TestScheduler_JobWithRetries(t *testing.T) {
 	var n int32
 	funcRetryJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
 		atomic.AddInt32(&n, 1)
@@ -328,7 +328,7 @@ func TestSchedulerJobWithRetries(t *testing.T) {
 	sched.Stop()
 }
 
-func TestSchedulerJobWithRetriesCtxDone(t *testing.T) {
+func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
 	var n int32
 	funcRetryJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
 		atomic.AddInt32(&n, 1)
@@ -372,7 +372,63 @@ func TestSchedulerJobWithRetriesCtxDone(t *testing.T) {
 	sched.Stop()
 }
 
-func TestSchedulerArgumentValidationErrors(t *testing.T) {
+func TestScheduler_PauseResume(t *testing.T) {
+	var n int32
+	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
+		atomic.AddInt32(&n, 1)
+		return "ok", nil
+	})
+	sched := quartz.NewStdScheduler()
+	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
+	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
+	assert.Equal(t, err, nil)
+
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
+	sched.Start(context.Background())
+
+	time.Sleep(55 * time.Millisecond)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 5)
+
+	err = sched.PauseJob(jobDetail.JobKey())
+	assert.Equal(t, err, nil)
+
+	time.Sleep(55 * time.Millisecond)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 5)
+
+	err = sched.ResumeJob(jobDetail.JobKey())
+	assert.Equal(t, err, nil)
+
+	time.Sleep(55 * time.Millisecond)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 10)
+
+	sched.Stop()
+}
+
+func TestScheduler_PauseResumeErrors(t *testing.T) {
+	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
+		return "ok", nil
+	})
+	sched := quartz.NewStdScheduler()
+	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
+	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
+	assert.Equal(t, err, nil)
+
+	err = sched.ResumeJob(jobDetail.JobKey())
+	assert.NotEqual(t, err, nil)
+	err = sched.ResumeJob(quartz.NewJobKey("funcJob2"))
+	assert.NotEqual(t, err, nil)
+
+	err = sched.PauseJob(jobDetail.JobKey())
+	assert.Equal(t, err, nil)
+	err = sched.PauseJob(jobDetail.JobKey())
+	assert.NotEqual(t, err, nil)
+	err = sched.PauseJob(quartz.NewJobKey("funcJob2"))
+	assert.NotEqual(t, err, nil)
+
+	sched.Stop()
+}
+
+func TestScheduler_ArgumentValidationErrors(t *testing.T) {
 	sched := quartz.NewStdScheduler()
 	job := job.NewShellJob("ls -la")
 	trigger := quartz.NewRunOnceTrigger(time.Millisecond)
@@ -393,11 +449,19 @@ func TestSchedulerArgumentValidationErrors(t *testing.T) {
 	err = sched.DeleteJob(nil)
 	assert.ErrorContains(t, err, "jobKey is nil")
 
+	err = sched.PauseJob(nil)
+	assert.ErrorContains(t, err, "jobKey is nil")
+
+	err = sched.ResumeJob(nil)
+	assert.ErrorContains(t, err, "jobKey is nil")
+
 	_, err = sched.GetScheduledJob(nil)
 	assert.ErrorContains(t, err, "jobKey is nil")
+
+	sched.Stop()
 }
 
-func TestSchedulerStartStop(t *testing.T) {
+func TestScheduler_StartStop(t *testing.T) {
 	sched := quartz.NewStdScheduler()
 	ctx := context.Background()
 	sched.Start(ctx)

@@ -38,6 +38,13 @@ type Scheduler interface {
 	// scheduler's execution queue.
 	DeleteJob(jobKey *JobKey) error
 
+	// PauseJob suspends the job with the specified key from being
+	// executed by the scheduler.
+	PauseJob(jobKey *JobKey) error
+
+	// ResumeJob restarts the suspended job with the specified key.
+	ResumeJob(jobKey *JobKey) error
+
 	// Clear removes all of the scheduled jobs.
 	Clear() error
 
