@@ -3,6 +3,7 @@ package quartz
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -41,6 +42,13 @@ type Scheduler interface {
 	// DeleteJob removes the job with the specified key from the
 	// scheduler's execution queue.
 	DeleteJob(jobKey *JobKey) error
+
+	// PauseJob suspends the job with the specified key from being
+	// executed by the scheduler.
+	PauseJob(jobKey *JobKey) error
+
+	// ResumeJob restarts the suspended job with the specified key.
+	ResumeJob(jobKey *JobKey) error
 
 	// Clear removes all of the scheduled jobs.
 	Clear() error
@@ -147,11 +155,14 @@ func (sched *StdScheduler) ScheduleJob(
 	if trigger == nil {
 		return illegalArgumentError("trigger is nil")
 	}
-	nextRunTime, err := trigger.NextFireTime(NowNano())
-	if err != nil {
-		return err
+	nextRunTime := int64(math.MaxInt64)
+	var err error
+	if !jobDetail.opts.Suspended {
+		nextRunTime, err = trigger.NextFireTime(NowNano())
+		if err != nil {
+			return err
+		}
 	}
-
 	toSchedule := &scheduledJob{
 		job:      jobDetail,
 		trigger:  trigger,
@@ -226,13 +237,7 @@ func (sched *StdScheduler) GetScheduledJob(jobKey *JobKey) (ScheduledJob, error)
 	if jobKey == nil {
 		return nil, illegalArgumentError("jobKey is nil")
 	}
-	scheduledJobs := sched.queue.ScheduledJobs()
-	for _, scheduled := range scheduledJobs {
-		if scheduled.JobDetail().jobKey.Equals(jobKey) {
-			return scheduled, nil
-		}
-	}
-	return nil, jobNotFoundError(fmt.Sprintf("for key %s", jobKey))
+	return sched.queue.Get(jobKey)
 }
 
 // DeleteJob removes the Job with the specified key if present.
@@ -245,6 +250,73 @@ func (sched *StdScheduler) DeleteJob(jobKey *JobKey) error {
 		logger.Debugf("Successfully deleted job %s.", jobKey)
 		if sched.IsStarted() {
 			sched.reset()
+		}
+	}
+	return err
+}
+
+// PauseJob suspends the job with the specified key from being
+// executed by the scheduler.
+func (sched *StdScheduler) PauseJob(jobKey *JobKey) error {
+	if jobKey == nil {
+		return illegalArgumentError("jobKey is nil")
+	}
+	job, err := sched.queue.Get(jobKey)
+	if err != nil {
+		return err
+	}
+	if job.JobDetail().opts.Suspended {
+		return illegalStateError(fmt.Sprintf("job %s is suspended", jobKey))
+	}
+	job, err = sched.queue.Remove(jobKey)
+	if err == nil {
+		job.JobDetail().opts.Suspended = true
+		paused := &scheduledJob{
+			job:      job.JobDetail(),
+			trigger:  job.Trigger(),
+			priority: int64(math.MaxInt64),
+		}
+		err = sched.queue.Push(paused)
+		if err == nil {
+			logger.Debugf("Successfully paused job %s.", jobKey)
+			if sched.IsStarted() {
+				sched.reset()
+			}
+		}
+	}
+	return err
+}
+
+// ResumeJob restarts the suspended job with the specified key.
+func (sched *StdScheduler) ResumeJob(jobKey *JobKey) error {
+	if jobKey == nil {
+		return illegalArgumentError("jobKey is nil")
+	}
+	job, err := sched.queue.Get(jobKey)
+	if err != nil {
+		return err
+	}
+	if !job.JobDetail().opts.Suspended {
+		return illegalStateError(fmt.Sprintf("job %s is active", jobKey))
+	}
+	job, err = sched.queue.Remove(jobKey)
+	if err == nil {
+		job.JobDetail().opts.Suspended = false
+		nextRunTime, err := job.Trigger().NextFireTime(NowNano())
+		if err != nil {
+			return err
+		}
+		resumed := &scheduledJob{
+			job:      job.JobDetail(),
+			trigger:  job.Trigger(),
+			priority: nextRunTime,
+		}
+		err = sched.queue.Push(resumed)
+		if err == nil {
+			logger.Debugf("Successfully resumed job %s.", jobKey)
+			if sched.IsStarted() {
+				sched.reset()
+			}
 		}
 	}
 	return err
@@ -418,6 +490,9 @@ retryLoop:
 }
 
 func (sched *StdScheduler) validateJob(job ScheduledJob) (bool, func() (int64, error)) {
+	if job.JobDetail().opts.Suspended {
+		return false, func() (int64, error) { return math.MaxInt64, nil }
+	}
 	now := NowNano()
 	if job.NextRunTime() < now-sched.opts.OutdatedThreshold.Nanoseconds() {
 		duration := time.Duration(now - job.NextRunTime())

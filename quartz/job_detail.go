@@ -1,6 +1,8 @@
 package quartz
 
-import "time"
+import (
+	"time"
+)
 
 // JobDetailOptions represents additional JobDetail properties.
 type JobDetailOptions struct {
@@ -13,19 +15,24 @@ type JobDetailOptions struct {
 	// Default: 1 second.
 	RetryInterval time.Duration
 
-	// Replace specifies whether the job should replace an existing job
+	// Replace indicates whether the job should replace an existing job
 	// with the same key.
 	// Default: false.
 	Replace bool
+
+	// Suspended indicates whether the job is paused.
+	// Default: false.
+	Suspended bool
 }
 
 // NewDefaultJobDetailOptions returns a new instance of JobDetailOptions
 // with the default values.
 func NewDefaultJobDetailOptions() *JobDetailOptions {
-	return &JobDetailOptions{
+	return &JobDetailOptions{ // using explicit default values for visibility
 		MaxRetries:    0,
 		RetryInterval: time.Second,
 		Replace:       false,
+		Suspended:     false,
 	}
 }
 
