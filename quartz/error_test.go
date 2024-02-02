@@ -17,6 +17,15 @@ func TestIllegalArgumentError(t *testing.T) {
 	assert.Equal(t, err.Error(), fmt.Sprintf("%s: %s", ErrIllegalArgument, message))
 }
 
+func TestIllegalStateError(t *testing.T) {
+	message := "job already exists"
+	err := illegalStateError(message)
+	if !errors.Is(err, ErrIllegalState) {
+		t.Fatal("error must match ErrIllegalState")
+	}
+	assert.Equal(t, err.Error(), fmt.Sprintf("%s: %s", ErrIllegalState, message))
+}
+
 func TestCronParseError(t *testing.T) {
 	message := "invalid field"
 	err := cronParseError(message)

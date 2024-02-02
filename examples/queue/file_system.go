@@ -234,6 +234,32 @@ func findHead() (quartz.ScheduledJob, error) {
 	return job, nil
 }
 
+// Get returns the scheduled job with the specified key without removing it
+// from the queue.
+func (jq *jobQueue) Get(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
+	jq.mtx.Lock()
+	defer jq.mtx.Unlock()
+	logger.Trace("Get")
+	fileInfo, err := os.ReadDir(dataFolder)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range fileInfo {
+		if !file.IsDir() {
+			data, err := os.ReadFile(fmt.Sprintf("%s/%s", dataFolder, file.Name()))
+			if err == nil {
+				job, err := unmarshal(data)
+				if err == nil {
+					if jobKey.Equals(job.JobDetail().JobKey()) {
+						return job, nil
+					}
+				}
+			}
+		}
+	}
+	return nil, errors.New("no jobs found")
+}
+
 // Remove removes and returns the scheduled job with the specified key.
 func (jq *jobQueue) Remove(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 	jq.mtx.Lock()
