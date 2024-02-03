@@ -2,7 +2,6 @@ package quartz
 
 import (
 	"container/heap"
-	"errors"
 	"fmt"
 	"sync"
 )
@@ -153,7 +152,7 @@ func (jq *jobQueue) Pop() (ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
 	if len(jq.delegate) == 0 {
-		return nil, errors.New("queue is empty")
+		return nil, ErrQueueEmpty
 	}
 	return heap.Pop(&jq.delegate).(ScheduledJob), nil
 }
@@ -163,7 +162,7 @@ func (jq *jobQueue) Head() (ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
 	if len(jq.delegate) == 0 {
-		return nil, errors.New("queue is empty")
+		return nil, ErrQueueEmpty
 	}
 	return jq.delegate[0], nil
 }

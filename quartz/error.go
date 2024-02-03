@@ -11,6 +11,8 @@ var (
 	ErrIllegalState    = errors.New("illegal state")
 	ErrCronParse       = errors.New("parse cron expression")
 	ErrJobNotFound     = errors.New("job not found")
+	ErrQueueEmpty      = errors.New("queue is empty")
+	ErrTriggerExpired  = errors.New("trigger has expired")
 )
 
 // illegalArgumentError returns an illegal argument error with a custom

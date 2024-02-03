@@ -1,7 +1,6 @@
 package quartz
 
 import (
-	"errors"
 	"fmt"
 	"time"
 )
@@ -68,7 +67,7 @@ func (ot *RunOnceTrigger) NextFireTime(prev int64) (int64, error) {
 		return next, nil
 	}
 
-	return 0, errors.New("RunOnce trigger is expired")
+	return 0, ErrTriggerExpired
 }
 
 // Description returns the description of the trigger.
