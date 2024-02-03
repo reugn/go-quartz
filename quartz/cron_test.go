@@ -12,248 +12,155 @@ import (
 
 func TestCronExpression1(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("10/20 15 14 5-10 * ? *")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
 	assert.Equal(t, result, "Sun Jul 9 14:15:30 2023")
 }
 
 func TestCronExpression2(t *testing.T) {
-	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("* 5,7,9 14-16 * * ? *")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
-	assert.Equal(t, result, "Sat Apr 22 14:05:49 2023")
+	prev := time.Date(2024, 1, 1, 12, 00, 00, 00, time.UTC).UnixNano()
+	cronTrigger, err := quartz.NewCronTrigger("10 5,7,9 14-16 * * ? *")
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
+	assert.Equal(t, result, "Sat Jan 6 15:07:10 2024")
 }
 
 func TestCronExpression3(t *testing.T) {
-	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("* 5,7,9 14/2 ? * WED,Sat *")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
-	assert.Equal(t, result, "Sat Apr 22 14:05:49 2023")
+	prev := time.Date(2024, 1, 1, 12, 00, 00, 00, time.UTC).UnixNano()
+	cronTrigger, err := quartz.NewCronTrigger("0 5,7,9 14/2 ? * WED,Sat *")
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
+	assert.Equal(t, result, "Sat Jan 13 16:07:00 2024")
 }
 
 func TestCronExpression4(t *testing.T) {
 	expression := "0 5,7 14 1 * Sun *"
 	_, err := quartz.NewCronTrigger(expression)
-	if err == nil {
-		t.Fatalf("%s should fail", expression)
-	}
+	assert.ErrorIs(t, err, quartz.ErrCronParse)
 }
 
 func TestCronExpression5(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("* * * * * ? *")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
 	assert.Equal(t, result, "Sat Apr 22 12:00:50 2023")
 }
 
 func TestCronExpression6(t *testing.T) {
-	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("* * 14/2 ? * mon/3 *")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
-	assert.Equal(t, result, "Mon Apr 24 14:00:49 2023")
+	prev := time.Date(2024, 1, 1, 12, 00, 00, 00, time.UTC).UnixNano()
+	cronTrigger, err := quartz.NewCronTrigger("0 0 14/2 ? * mon/3 *")
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
+	assert.Equal(t, result, "Thu Feb 1 22:00:00 2024")
 }
 
 func TestCronExpression7(t *testing.T) {
-	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
-	cronTrigger, err := quartz.NewCronTrigger("* 5-9 14/2 ? * 1-3 *")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
-	assert.Equal(t, result, "Sun Apr 23 14:05:49 2023")
+	prev := time.Date(2024, 1, 1, 12, 00, 00, 00, time.UTC).UnixNano()
+	cronTrigger, err := quartz.NewCronTrigger("0 5-9 14/2 ? * 3-5 *")
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
+	assert.Equal(t, result, "Wed Jan 3 22:09:00 2024")
 }
 
 func TestCronExpression8(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("*/3 */51 */12 */2 */4 ? *")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
 	assert.Equal(t, result, "Mon May 1 12:00:27 2023")
 }
 
 func TestCronExpression9(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("*/15 * * ? * 1-7")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
 	assert.Equal(t, result, "Sat Apr 22 12:12:30 2023")
 }
 
 func TestCronExpression10(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("10,20 10,20 10,20 10,20 6,12 ?")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
 	assert.Equal(t, result, "Tue Dec 10 10:10:20 2024")
 }
 
 func TestCronExpression11(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("10,20 10,20 10,20 ? 6,12 3,6")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
 	assert.Equal(t, result, "Fri Jun 23 10:10:20 2023")
 }
 
 func TestCronExpression12(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("0 0 0 ? 4,6 SAT,MON")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
 	assert.Equal(t, result, "Sat Apr 18 00:00:00 2026")
 }
 
 func TestCronExpression13(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("0 0 0 29 2 ?")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 5)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 5)
 	assert.Equal(t, result, "Wed Feb 29 00:00:00 2040")
 }
 
 func TestCronExpression14(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("0 0 0 1 5 ? 2023/2")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 10)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 10)
 	assert.Equal(t, result, "Wed May 1 00:00:00 2041")
 }
 
 func TestCronExpressionMixedRange(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("0 0 0-2,5,7-9,21-22 * * *")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 10)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 10)
 	assert.Equal(t, result, "Sun Apr 23 21:00:00 2023")
 }
 
 func TestCronExpressionMixedStringRange(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("0 0 0 ? * SUN,TUE-WED,Fri-Sat")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 10)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 10)
 	assert.Equal(t, result, "Sat May 6 00:00:00 2023")
 }
 
 func TestCronExpressionExpired(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
 	cronTrigger, err := quartz.NewCronTrigger("0 0 0 1 1 ? 2023")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.IsNil(t, err)
 	_, err = cronTrigger.NextFireTime(prev)
-	if err == nil {
-		t.Fatal("cron expression should be expired")
-	}
+	assert.ErrorIs(t, err, quartz.ErrTriggerExpired)
 }
 
 func TestCronExpressionWithLoc(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
+	assert.IsNil(t, err)
 	prev := time.Date(2023, 4, 29, 12, 00, 00, 00, loc).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
-	if err != nil {
-		t.Fatal(err)
-	}
-	cronTrigger, err := quartz.NewCronTriggerWithLoc("* 5 22-23 * * Sun *", loc)
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
-	assert.Equal(t, result, "Mon May 1 02:05:49 2023") // Result comparison is in UTC time
+	cronTrigger, err := quartz.NewCronTriggerWithLoc("0 5 22-23 * * Sun *", loc)
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
+	assert.Equal(t, result, "Mon Oct 16 03:05:00 2023") // Result comparison is in UTC time
 }
 
 func TestCronExpressionWithLoc2(t *testing.T) {
 	loc, err := time.LoadLocation("America/New_York")
+	assert.IsNil(t, err)
 	prev := time.Date(2023, 4, 29, 12, 00, 00, 00, loc).UnixNano()
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
-	if err != nil {
-		t.Fatal(err)
-	}
 	cronTrigger, err := quartz.NewCronTriggerWithLoc("0 0 10 * * Sun *", loc)
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 50)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 50)
 	assert.Equal(t, result, "Sun Apr 7 14:00:00 2024")
 }
 
@@ -279,77 +186,50 @@ func cronDayOfWeek(t *testing.T, dayOfWeek, expected string) {
 	prev := int64(1555524000000000000) // Wed Apr 17 18:00:00 2019
 	expression := fmt.Sprintf("0 0 0 * * %s", dayOfWeek)
 	cronTrigger, err := quartz.NewCronTrigger(expression)
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		nextFireTime, err := cronTrigger.NextFireTime(prev)
-		if err != nil {
-			t.Fatal(err)
-		} else {
-			assert.Equal(t, time.Unix(nextFireTime/int64(time.Second), 0).UTC().Format(readDateLayout),
-				expected)
-		}
-	}
+	assert.IsNil(t, err)
+	nextFireTime, err := cronTrigger.NextFireTime(prev)
+	assert.IsNil(t, err)
+	assert.Equal(t, time.Unix(nextFireTime/int64(time.Second), 0).UTC().Format(readDateLayout),
+		expected)
 }
 
 func TestCronYearly(t *testing.T) {
 	prev := int64(1555351200000000000)
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("@yearly")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 100)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 100)
 	assert.Equal(t, result, "Sun Jan 1 00:00:00 2119")
 }
 
 func TestCronMonthly(t *testing.T) {
 	prev := int64(1555351200000000000)
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("@monthly")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 100)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 100)
 	assert.Equal(t, result, "Sun Aug 1 00:00:00 2027")
 }
 
 func TestCronWeekly(t *testing.T) {
 	prev := int64(1555351200000000000)
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("@weekly")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 100)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 100)
 	assert.Equal(t, result, "Sun Mar 14 00:00:00 2021")
 }
 
 func TestCronDaily(t *testing.T) {
 	prev := int64(1555351200000000000)
-	fmt.Println(time.Unix(0, prev).UTC())
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("@daily")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 1000)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 1000)
 	assert.Equal(t, result, "Sun Jan 9 00:00:00 2022")
 }
 
 func TestCronHourly(t *testing.T) {
 	prev := int64(1555351200000000000)
-	result := ""
 	cronTrigger, err := quartz.NewCronTrigger("@hourly")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		result, _ = iterate(prev, cronTrigger, 1000)
-	}
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 1000)
 	assert.Equal(t, result, "Mon May 27 10:00:00 2019")
 }
 
@@ -366,12 +246,12 @@ func TestCronTriggerNilLocationError(t *testing.T) {
 func TestCronExpressionDescription(t *testing.T) {
 	expression := "0 0 0 29 2 ?"
 	cronTrigger, err := quartz.NewCronTrigger(expression)
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 	assert.Equal(t, cronTrigger.Description(), fmt.Sprintf("CronTrigger::%s::UTC", expression))
 }
 
 func TestValidateCronExpression(t *testing.T) {
-	assert.Equal(t, quartz.ValidateCronExpression("@monthly"), nil)
+	assert.IsNil(t, quartz.ValidateCronExpression("@monthly"))
 	assert.NotEqual(t, quartz.ValidateCronExpression(""), nil)
 }
 
@@ -397,9 +277,7 @@ func TestCronExpressionError(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test, func(t *testing.T) {
 			_, err := quartz.NewCronTrigger(test)
-			if err == nil {
-				t.Error("expected error")
-			}
+			assert.ErrorIs(t, err, quartz.ErrCronParse)
 		})
 	}
 }

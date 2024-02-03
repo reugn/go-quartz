@@ -1,7 +1,6 @@
 package quartz
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -80,7 +79,7 @@ func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 	csm := makeCSMFromFields(prevTime, ct.fields)
 	nextDateTime := csm.NextTriggerTime(prevTime.Location())
 	if nextDateTime.Before(prevTime) || nextDateTime.Equal(prevTime) {
-		return 0, errors.New("next trigger time is in the past")
+		return 0, ErrTriggerExpired
 	}
 	return nextDateTime.UnixNano(), nil
 }
@@ -136,7 +135,6 @@ func ValidateCronExpression(expression string) error {
 // parseCronExpression parses a cron expression string.
 func parseCronExpression(expression string) ([]*cronField, error) {
 	var tokens []string
-
 	if value, ok := special[expression]; ok {
 		tokens = strings.Split(value, " ")
 	} else {
@@ -294,7 +292,6 @@ func parseStepField(field string, min, max int, translate []string) (*cronField,
 	if len(t) != 2 {
 		return nil, cronParseError(fmt.Sprintf("invalid step field %s", field))
 	}
-
 	if t[0] == "*" {
 		t[0] = strconv.Itoa(min)
 	}
