@@ -27,7 +27,7 @@ func TestScheduler(t *testing.T) {
 	jobKeys[0] = quartz.NewJobKey("shellJob")
 
 	request, err := http.NewRequest(http.MethodGet, "https://worldtimeapi.org/api/timezone/utc", nil)
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	curlJob := job.NewCurlJobWithOptions(request, job.CurlJobOptions{HTTPClient: mock.HTTPHandlerOk})
 	jobKeys[1] = quartz.NewJobKey("curlJob")
@@ -36,7 +36,7 @@ func TestScheduler(t *testing.T) {
 	jobKeys[2] = quartz.NewJobKey("errShellJob")
 
 	request, err = http.NewRequest(http.MethodGet, "http://", nil)
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 	errCurlJob := job.NewCurlJob(request)
 	jobKeys[3] = quartz.NewJobKey("errCurlJob")
 
@@ -45,33 +45,33 @@ func TestScheduler(t *testing.T) {
 
 	err = sched.ScheduleJob(quartz.NewJobDetail(shellJob, jobKeys[0]),
 		quartz.NewSimpleTrigger(time.Millisecond*700))
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 	err = sched.ScheduleJob(quartz.NewJobDetail(curlJob, jobKeys[1]),
 		quartz.NewRunOnceTrigger(time.Millisecond))
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 	err = sched.ScheduleJob(quartz.NewJobDetail(errShellJob, jobKeys[2]),
 		quartz.NewRunOnceTrigger(time.Millisecond))
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 	err = sched.ScheduleJob(quartz.NewJobDetail(errCurlJob, jobKeys[3]),
 		quartz.NewSimpleTrigger(time.Millisecond*800))
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	time.Sleep(time.Second)
 	scheduledJobKeys := sched.GetJobKeys()
 	assert.Equal(t, scheduledJobKeys, []*quartz.JobKey{jobKeys[0], jobKeys[3]})
 
 	_, err = sched.GetScheduledJob(jobKeys[0])
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	err = sched.DeleteJob(jobKeys[0]) // shellJob key
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	nonExistentJobKey := quartz.NewJobKey("NA")
 	_, err = sched.GetScheduledJob(nonExistentJobKey)
-	assert.ErrorContains(t, err, quartz.ErrJobNotFound.Error())
+	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
 
 	err = sched.DeleteJob(nonExistentJobKey)
-	assert.NotEqual(t, err, nil)
+	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
 
 	scheduledJobKeys = sched.GetJobKeys()
 	assert.Equal(t, len(scheduledJobKeys), 1)
@@ -81,7 +81,7 @@ func TestScheduler(t *testing.T) {
 	assert.Equal(t, len(sched.GetJobKeys()), 0)
 	sched.Stop()
 	_, err = curlJob.DumpResponse(true)
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 	assert.Equal(t, shellJob.JobStatus(), job.StatusOK)
 	assert.Equal(t, curlJob.JobStatus(), job.StatusOK)
 	assert.Equal(t, errShellJob.JobStatus(), job.StatusFailure)
@@ -306,7 +306,7 @@ func TestScheduler_JobWithRetries(t *testing.T) {
 		opts,
 	)
 	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusNA)
 	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
@@ -348,7 +348,7 @@ func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
 		opts,
 	)
 	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusNA)
 	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
@@ -381,7 +381,7 @@ func TestScheduler_PauseResume(t *testing.T) {
 	sched := quartz.NewStdScheduler()
 	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
 	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
 	sched.Start(context.Background())
@@ -390,13 +390,13 @@ func TestScheduler_PauseResume(t *testing.T) {
 	assert.Equal(t, int(atomic.LoadInt32(&n)), 5)
 
 	err = sched.PauseJob(jobDetail.JobKey())
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	time.Sleep(55 * time.Millisecond)
 	assert.Equal(t, int(atomic.LoadInt32(&n)), 5)
 
 	err = sched.ResumeJob(jobDetail.JobKey())
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	time.Sleep(55 * time.Millisecond)
 	assert.Equal(t, int(atomic.LoadInt32(&n)), 10)
@@ -411,19 +411,19 @@ func TestScheduler_PauseResumeErrors(t *testing.T) {
 	sched := quartz.NewStdScheduler()
 	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
 	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	err = sched.ResumeJob(jobDetail.JobKey())
-	assert.NotEqual(t, err, nil)
+	assert.ErrorIs(t, err, quartz.ErrIllegalState)
 	err = sched.ResumeJob(quartz.NewJobKey("funcJob2"))
-	assert.NotEqual(t, err, nil)
+	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
 
 	err = sched.PauseJob(jobDetail.JobKey())
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 	err = sched.PauseJob(jobDetail.JobKey())
-	assert.NotEqual(t, err, nil)
+	assert.ErrorIs(t, err, quartz.ErrIllegalState)
 	err = sched.PauseJob(quartz.NewJobKey("funcJob2"))
-	assert.NotEqual(t, err, nil)
+	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
 
 	sched.Stop()
 }
@@ -433,7 +433,7 @@ func TestScheduler_ArgumentValidationErrors(t *testing.T) {
 	job := job.NewShellJob("ls -la")
 	trigger := quartz.NewRunOnceTrigger(time.Millisecond)
 	expiredTrigger, err := quartz.NewCronTrigger("0 0 0 1 1 ? 2023")
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	err = sched.ScheduleJob(nil, trigger)
 	assert.ErrorContains(t, err, "jobDetail is nil")
@@ -444,7 +444,7 @@ func TestScheduler_ArgumentValidationErrors(t *testing.T) {
 	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKeyWithGroup("job", "")), nil)
 	assert.ErrorContains(t, err, "trigger is nil")
 	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKey("job")), expiredTrigger)
-	assert.ErrorContains(t, err, "next trigger time is in the past")
+	assert.ErrorIs(t, err, quartz.ErrTriggerExpired)
 
 	err = sched.DeleteJob(nil)
 	assert.ErrorContains(t, err, "jobKey is nil")

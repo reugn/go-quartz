@@ -16,15 +16,15 @@ func TestSimpleTrigger(t *testing.T) {
 
 	next, err := trigger.NextFireTime(fromEpoch)
 	assert.Equal(t, next, 1577836805000000000)
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	next, err = trigger.NextFireTime(next)
 	assert.Equal(t, next, 1577836810000000000)
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	next, err = trigger.NextFireTime(next)
 	assert.Equal(t, next, 1577836815000000000)
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 }
 
 func TestRunOnceTrigger(t *testing.T) {
@@ -33,10 +33,10 @@ func TestRunOnceTrigger(t *testing.T) {
 
 	next, err := trigger.NextFireTime(fromEpoch)
 	assert.Equal(t, next, 1577836805000000000)
-	assert.Equal(t, err, nil)
+	assert.IsNil(t, err)
 
 	next, err = trigger.NextFireTime(next)
 	assert.Equal(t, trigger.Description(), "RunOnceTrigger::5s::expired")
 	assert.Equal(t, next, 0)
-	assert.NotEqual(t, err, nil)
+	assert.ErrorIs(t, err, quartz.ErrTriggerExpired)
 }
