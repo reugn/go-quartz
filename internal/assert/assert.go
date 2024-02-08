@@ -26,6 +26,14 @@ func NotEqual[T any](t *testing.T, a T, b T) {
 // IsNil verifies that the object is nil.
 func IsNil(t *testing.T, obj any) {
 	if obj != nil {
+		value := reflect.ValueOf(obj)
+		switch value.Kind() {
+		case reflect.Ptr, reflect.Map, reflect.Slice,
+			reflect.Interface, reflect.Func, reflect.Chan:
+			if value.IsNil() {
+				return
+			}
+		}
 		t.Helper()
 		t.Fatalf("%v is not nil", obj)
 	}
