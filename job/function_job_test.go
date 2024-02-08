@@ -2,7 +2,6 @@ package job_test
 
 import (
 	"context"
-	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -29,12 +28,12 @@ func TestFunctionJob(t *testing.T) {
 
 	sched := quartz.NewStdScheduler()
 	sched.Start(ctx)
-	sched.ScheduleJob(quartz.NewJobDetail(funcJob1, quartz.NewJobKey("funcJob1")),
-		quartz.NewRunOnceTrigger(time.Millisecond*300))
-	sched.ScheduleJob(quartz.NewJobDetail(funcJob2, quartz.NewJobKey("funcJob2")),
-		quartz.NewRunOnceTrigger(time.Millisecond*800))
+	assert.IsNil(t, sched.ScheduleJob(quartz.NewJobDetail(funcJob1, quartz.NewJobKey("funcJob1")),
+		quartz.NewRunOnceTrigger(time.Millisecond*300)))
+	assert.IsNil(t, sched.ScheduleJob(quartz.NewJobDetail(funcJob2, quartz.NewJobKey("funcJob2")),
+		quartz.NewRunOnceTrigger(time.Millisecond*800)))
 	time.Sleep(time.Second)
-	_ = sched.Clear()
+	assert.IsNil(t, sched.Clear())
 	sched.Stop()
 
 	assert.Equal(t, funcJob1.JobStatus(), job.StatusOK)
@@ -81,7 +80,7 @@ func TestFunctionJobRespectsContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	sig := make(chan struct{})
-	go func() { defer close(sig); funcJob2.Execute(ctx) }()
+	go func() { defer close(sig); _ = funcJob2.Execute(ctx) }()
 
 	if n != 0 {
 		t.Fatal("job should not have run yet")
@@ -92,10 +91,6 @@ func TestFunctionJobRespectsContext(t *testing.T) {
 	if n != -1 {
 		t.Fatal("job side effect should have reflected cancelation:", n)
 	}
-	if !errors.Is(funcJob2.Error(), context.Canceled) {
-		t.Fatal("unexpected error function", funcJob2.Error())
-	}
-	if funcJob2.Result() != nil {
-		t.Fatal("errored jobs should not return values")
-	}
+	assert.ErrorIs(t, funcJob2.Error(), context.Canceled)
+	assert.IsNil(t, funcJob2.Result())
 }

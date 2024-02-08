@@ -55,7 +55,7 @@ func TestMultipleExecution(t *testing.T) {
 				case <-timer.C:
 					// sleep for a jittered amount of
 					// time, less than 11ms
-					job.Execute(ctx)
+					_ = job.Execute(ctx)
 				case <-ctx.Done():
 					return
 				case <-sig:
@@ -92,9 +92,7 @@ var worldtimeapiURL = "https://worldtimeapi.org/api/timezone/utc"
 
 func TestCurlJob(t *testing.T) {
 	request, err := http.NewRequest(http.MethodGet, worldtimeapiURL, nil)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.IsNil(t, err)
 
 	tests := []struct {
 		name           string
@@ -118,7 +116,7 @@ func TestCurlJob(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			httpJob := job.NewCurlJobWithOptions(tt.request, tt.opts)
-			httpJob.Execute(context.Background())
+			_ = httpJob.Execute(context.Background())
 			assert.Equal(t, httpJob.JobStatus(), tt.expectedStatus)
 		})
 	}
@@ -130,9 +128,7 @@ func TestCurlJobDescription(t *testing.T) {
 		worldtimeapiURL,
 		strings.NewReader("{\"a\":1}"),
 	)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.IsNil(t, err)
 	postRequest.Header = http.Header{
 		"Content-Type": {"application/json"},
 	}
@@ -141,9 +137,7 @@ func TestCurlJobDescription(t *testing.T) {
 		worldtimeapiURL,
 		nil,
 	)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.IsNil(t, err)
 
 	tests := []struct {
 		name                string
@@ -219,7 +213,7 @@ func TestShellJob_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sh := job.NewShellJob(tt.args.Cmd)
-			sh.Execute(context.TODO())
+			_ = sh.Execute(context.TODO())
 
 			assert.Equal(t, tt.args.ExitCode, sh.ExitCode())
 			assert.Equal(t, tt.args.Stderr, sh.Stderr())
@@ -232,7 +226,7 @@ func TestShellJob_Execute(t *testing.T) {
 	// invalid command
 	stdoutShell := "invalid_command"
 	sh := job.NewShellJob(stdoutShell)
-	sh.Execute(context.Background())
+	_ = sh.Execute(context.Background())
 	assert.Equal(t, 127, sh.ExitCode())
 	// the return value is different under different platforms.
 }
@@ -246,7 +240,7 @@ func TestShellJob_WithCallback(t *testing.T) {
 			resultChan <- job.Stdout()
 		},
 	)
-	shJob.Execute(context.Background())
+	_ = shJob.Execute(context.Background())
 
 	assert.Equal(t, "", shJob.Stderr())
 	assert.Equal(t, "ok", shJob.Stdout())
@@ -255,9 +249,8 @@ func TestShellJob_WithCallback(t *testing.T) {
 
 func TestCurlJob_WithCallback(t *testing.T) {
 	request, err := http.NewRequest(http.MethodGet, worldtimeapiURL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.IsNil(t, err)
+
 	resultChan := make(chan job.Status, 1)
 	opts := job.CurlJobOptions{
 		Callback: func(_ context.Context, job *job.CurlJob) {
@@ -265,7 +258,7 @@ func TestCurlJob_WithCallback(t *testing.T) {
 		},
 	}
 	curlJob := job.NewCurlJobWithOptions(request, opts)
-	curlJob.Execute(context.Background())
+	_ = curlJob.Execute(context.Background())
 
 	assert.Equal(t, job.StatusOK, <-resultChan)
 }

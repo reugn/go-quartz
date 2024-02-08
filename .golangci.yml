@@ -1,14 +1,16 @@
 run:
-  skip-dirs:
-    - examples
+  timeout: 1m
 
 linters:
   disable-all: true
   enable:
     - dupl
     - errcheck
+    - errname
+    - errorlint
     - exportloopref
     - funlen
+    - gci
     - goconst
     - gocritic
     - gocyclo
@@ -28,14 +30,14 @@ linters:
     - unparam
     - unused
 
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - (*log.Logger).Output
+
 issues:
   exclude-rules:
     - path: _test\.go
       linters:
-        - errcheck
         - unparam
-        - prealloc
         - funlen
-    - path: logger/simple_logger.go
-      linters:
-        - errcheck
