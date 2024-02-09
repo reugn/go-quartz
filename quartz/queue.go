@@ -58,8 +58,24 @@ type JobQueue interface {
 	// Remove removes and returns the scheduled job with the specified key.
 	Remove(jobKey *JobKey) (ScheduledJob, error)
 
-	// ScheduledJobs returns the slice of all scheduled jobs in the queue.
-	ScheduledJobs() []ScheduledJob
+	// ScheduledJobs returns a slice of scheduled jobs in the queue.
+	// The matchers parameter acts as a filter to build the resulting list.
+	// For a job to be returned in the result slice, it must satisfy all of the
+	// specified matchers. Empty matchers return all scheduled jobs in the queue.
+	//
+	// Custom queue implementations may consider using pattern matching on the
+	// specified matchers to create a predicate pushdown effect and optimize queries
+	// to filter data at the data source, e.g.
+	//
+	//	switch m := jobMatcher.(type) {
+	//	case *matcher.JobStatus:
+	//		// ... WHERE status = m.Suspended
+	//	case *matcher.JobGroup:
+	//		if m.Operator == &matcher.StringEquals {
+	//			// ... WHERE group_name = m.Pattern
+	//		}
+	//	}
+	ScheduledJobs([]Matcher[ScheduledJob]) []ScheduledJob
 
 	// Size returns the size of the job queue.
 	Size() int
@@ -193,13 +209,30 @@ func (jq *jobQueue) Remove(jobKey *JobKey) (ScheduledJob, error) {
 	return nil, jobNotFoundError(jobKey.String())
 }
 
-// ScheduledJobs returns the slice of all scheduled jobs in the queue.
-func (jq *jobQueue) ScheduledJobs() []ScheduledJob {
+// ScheduledJobs returns a slice of scheduled jobs in the queue.
+// For a job to be returned, it must satisfy all of the specified matchers.
+// Given an empty matchers it returns all scheduled jobs.
+func (jq *jobQueue) ScheduledJobs(matchers []Matcher[ScheduledJob]) []ScheduledJob {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	return jq.scheduledJobs()
+	if len(matchers) == 0 {
+		return jq.scheduledJobs()
+	}
+	matchedJobs := make([]ScheduledJob, 0)
+JobLoop:
+	for _, job := range jq.delegate {
+		for _, matcher := range matchers {
+			// require all matchers to match the job
+			if !matcher.IsMatch(job) {
+				continue JobLoop
+			}
+		}
+		matchedJobs = append(matchedJobs, job)
+	}
+	return matchedJobs
 }
 
+// scheduledJobs returns all scheduled jobs.
 func (jq *jobQueue) scheduledJobs() []ScheduledJob {
 	scheduledJobs := make([]ScheduledJob, len(jq.delegate))
 	for i, job := range jq.delegate {

@@ -58,7 +58,7 @@ func main() {
 
 	<-ctx.Done()
 
-	scheduledJobs := jobQueue.ScheduledJobs()
+	scheduledJobs := jobQueue.ScheduledJobs(nil)
 	jobNames := make([]string, 0, len(scheduledJobs))
 	for _, job := range scheduledJobs {
 		jobNames = append(jobNames, job.JobDetail().JobKey().String())
@@ -289,7 +289,7 @@ func (jq *jobQueue) Remove(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 }
 
 // ScheduledJobs returns the slice of all scheduled jobs in the queue.
-func (jq *jobQueue) ScheduledJobs() []quartz.ScheduledJob {
+func (jq *jobQueue) ScheduledJobs(matchers []quartz.Matcher[quartz.ScheduledJob]) []quartz.ScheduledJob {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
 	logger.Trace("ScheduledJobs")
@@ -303,13 +303,23 @@ func (jq *jobQueue) ScheduledJobs() []quartz.ScheduledJob {
 			data, err := os.ReadFile(fmt.Sprintf("%s/%s", dataFolder, file.Name()))
 			if err == nil {
 				job, err := unmarshal(data)
-				if err == nil {
+				if err == nil && isMatch(job, matchers) {
 					jobs = append(jobs, job)
 				}
 			}
 		}
 	}
 	return jobs
+}
+
+func isMatch(job quartz.ScheduledJob, matchers []quartz.Matcher[quartz.ScheduledJob]) bool {
+	for _, matcher := range matchers {
+		// require all matchers to match the job
+		if !matcher.IsMatch(job) {
+			return false
+		}
+	}
+	return true
 }
 
 // Size returns the size of the job queue.

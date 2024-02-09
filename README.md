@@ -28,8 +28,11 @@ type Scheduler interface {
 	// ScheduleJob schedules a job using a specified trigger.
 	ScheduleJob(jobDetail *JobDetail, trigger Trigger) error
 
-	// GetJobKeys returns the keys of all of the scheduled jobs.
-	GetJobKeys() []*JobKey
+	// GetJobKeys returns the keys of scheduled jobs.
+	// For a job key to be returned, the job must satisfy all of the
+	// matchers specified.
+	// Given no matchers, it returns the keys of all scheduled jobs.
+	GetJobKeys(...Matcher[ScheduledJob]) []*JobKey
 
 	// GetScheduledJob returns the scheduled job with the specified key.
 	GetScheduledJob(jobKey *JobKey) (ScheduledJob, error)
