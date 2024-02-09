@@ -44,3 +44,13 @@ func (jobKey *JobKey) Equals(that *JobKey) bool {
 	return jobKey.name == that.name &&
 		jobKey.group == that.group
 }
+
+// Name returns the name of the JobKey.
+func (jobKey *JobKey) Name() string {
+	return jobKey.name
+}
+
+// Group returns the group of the JobKey.
+func (jobKey *JobKey) Group() string {
+	return jobKey.group
+}

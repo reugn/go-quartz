@@ -33,8 +33,11 @@ type Scheduler interface {
 	// ScheduleJob schedules a job using a specified trigger.
 	ScheduleJob(jobDetail *JobDetail, trigger Trigger) error
 
-	// GetJobKeys returns the keys of all of the scheduled jobs.
-	GetJobKeys() []*JobKey
+	// GetJobKeys returns the keys of scheduled jobs.
+	// For a job key to be returned, the job must satisfy all of the
+	// matchers specified.
+	// Given no matchers, it returns the keys of all scheduled jobs.
+	GetJobKeys(...Matcher[ScheduledJob]) []*JobKey
 
 	// GetScheduledJob returns the scheduled job with the specified key.
 	GetScheduledJob(jobKey *JobKey) (ScheduledJob, error)
@@ -222,9 +225,11 @@ func (sched *StdScheduler) IsStarted() bool {
 	return sched.started
 }
 
-// GetJobKeys returns the keys of all of the scheduled jobs.
-func (sched *StdScheduler) GetJobKeys() []*JobKey {
-	scheduledJobs := sched.queue.ScheduledJobs()
+// GetJobKeys returns the keys of scheduled jobs.
+// For a job key to be returned, the job must satisfy all of the matchers specified.
+// Given no matchers, it returns the keys of all scheduled jobs.
+func (sched *StdScheduler) GetJobKeys(matchers ...Matcher[ScheduledJob]) []*JobKey {
+	scheduledJobs := sched.queue.ScheduledJobs(matchers)
 	keys := make([]*JobKey, 0, len(scheduledJobs))
 	for _, scheduled := range scheduledJobs {
 		keys = append(keys, scheduled.JobDetail().jobKey)
