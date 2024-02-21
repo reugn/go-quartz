@@ -2,6 +2,7 @@ package quartz
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,6 +48,7 @@ func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTri
 		return nil, illegalArgumentError("location is nil")
 	}
 
+	expression = trimCronExpression(expression)
 	fields, err := parseCronExpression(expression)
 	if err != nil {
 		return nil, err
@@ -128,7 +130,7 @@ var (
 // where the <year> field is optional.
 // See the cron expression format table in the readme file for supported special characters.
 func ValidateCronExpression(expression string) error {
-	_, err := parseCronExpression(expression)
+	_, err := parseCronExpression(trimCronExpression(expression))
 	return err
 }
 
@@ -152,6 +154,12 @@ func parseCronExpression(expression string) ([]*cronField, error) {
 	}
 
 	return buildCronField(tokens)
+}
+
+var whitespacePattern = regexp.MustCompile(`\s+`)
+
+func trimCronExpression(expression string) string {
+	return strings.TrimSpace(whitespacePattern.ReplaceAllString(expression, " "))
 }
 
 func buildCronField(tokens []string) ([]*cronField, error) {
