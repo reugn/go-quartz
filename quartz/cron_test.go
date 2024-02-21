@@ -250,9 +250,23 @@ func TestCronExpressionDescription(t *testing.T) {
 	assert.Equal(t, cronTrigger.Description(), fmt.Sprintf("CronTrigger::%s::UTC", expression))
 }
 
-func TestValidateCronExpression(t *testing.T) {
+func TestCronValidateExpression(t *testing.T) {
 	assert.IsNil(t, quartz.ValidateCronExpression("@monthly"))
 	assert.NotEqual(t, quartz.ValidateCronExpression(""), nil)
+}
+
+func TestCronTrimExpression(t *testing.T) {
+	expression := "  0 0  10 * *  Sun * "
+	assert.IsNil(t, quartz.ValidateCronExpression(expression))
+	trigger, err := quartz.NewCronTrigger(expression)
+	assert.IsNil(t, err)
+	assert.Equal(t, trigger.Description(), "CronTrigger::0 0 10 * * Sun *::UTC")
+
+	expression = " \t\n 0  0 10 *    *  Sun   \n* \r\n  "
+	assert.IsNil(t, quartz.ValidateCronExpression(expression))
+	trigger, err = quartz.NewCronTrigger(expression)
+	assert.IsNil(t, err)
+	assert.Equal(t, trigger.Description(), "CronTrigger::0 0 10 * * Sun *::UTC")
 }
 
 var readDateLayout = "Mon Jan 2 15:04:05 2006"
