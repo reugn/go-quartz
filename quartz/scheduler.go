@@ -2,6 +2,7 @@ package quartz
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -410,8 +411,11 @@ func (sched *StdScheduler) calculateNextTick() time.Duration {
 	if sched.queue.Size() > 0 {
 		scheduledJob, err := sched.queue.Head()
 		if err != nil {
-			logger.Warnf("Failed to calculate next tick for %s, err: %s",
-				scheduledJob.JobDetail().jobKey, err)
+			if errors.Is(err, ErrQueueEmpty) {
+				logger.Debug("Queue is empty")
+			} else {
+				logger.Warnf("Failed to calculate next tick: %s", err)
+			}
 		} else {
 			var nextTickDuration time.Duration
 			nextRunTime := scheduledJob.NextRunTime()
