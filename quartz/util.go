@@ -10,16 +10,16 @@ import (
 // Sep is the serialization delimiter; the default is a double colon.
 var Sep = "::"
 
-func indexes(search []string, target []string) ([]int, error) {
-	searchIndexes := make([]int, 0, len(search))
-	for _, a := range search {
-		index := intVal(target, a)
-		if index == -1 {
-			return nil, cronParseError(fmt.Sprintf("invalid cron field %s", a))
+func translateLiterals(glossary, literals []string) ([]int, error) {
+	intValues := make([]int, 0, len(literals))
+	for _, literal := range literals {
+		index, err := normalize(literal, glossary)
+		if err != nil {
+			return nil, err
 		}
-		searchIndexes = append(searchIndexes, index)
+		intValues = append(intValues, index)
 	}
-	return searchIndexes, nil
+	return intValues, nil
 }
 
 func extractRangeValues(parsed []string) ([]string, []string) {
@@ -35,16 +35,17 @@ func extractRangeValues(parsed []string) ([]string, []string) {
 	return values, rangeValues
 }
 
-func sliceAtoi(sa []string) ([]int, error) {
-	si := make([]int, 0, len(sa))
-	for _, a := range sa {
-		i, err := strconv.Atoi(a)
-		if err != nil {
-			return si, err
+func extractStepValues(parsed []string) ([]string, []string) {
+	values := make([]string, 0, len(parsed))
+	stepValues := make([]string, 0)
+	for _, v := range parsed {
+		if strings.Contains(v, "/") { // step value
+			stepValues = append(stepValues, v)
+		} else {
+			values = append(values, v)
 		}
-		si = append(si, i)
 	}
-	return si, nil
+	return values, stepValues
 }
 
 func fillRangeValues(from, to int) ([]int, error) {
@@ -73,35 +74,33 @@ func fillStepValues(from, step, max int) ([]int, error) {
 	return stepValues, nil
 }
 
-func normalize(field string, dict []string) int {
-	i, err := strconv.Atoi(field)
-	if err == nil {
-		return i
+func normalize(field string, glossary []string) (int, error) {
+	intVal, err := strconv.Atoi(field)
+	if err != nil {
+		return translateLiteral(glossary, field)
 	}
-	return intVal(dict, field)
+	return intVal, nil
 }
 
-func inScope(i, min, max int) bool {
-	if i >= min && i <= max {
+func inScope(value, min, max int) bool {
+	if value >= min && value <= max {
 		return true
 	}
 	return false
 }
 
-func intVal(source []string, target string) int {
-	upperCaseTarget := strings.ToUpper(target)
-	for i, v := range source {
-		if v == upperCaseTarget {
-			return i
+func translateLiteral(glossary []string, literal string) (int, error) {
+	upperCaseLiteral := strings.ToUpper(literal)
+	for i, value := range glossary {
+		if value == upperCaseLiteral {
+			return i, nil
 		}
 	}
-	return -1 // TODO: return error
+	return 0, cronParseError(fmt.Sprintf("unknown literal %s", literal))
 }
 
-// atoi implements an unsafe strconv.Atoi.
-func atoi(str string) int {
-	i, _ := strconv.Atoi(str)
-	return i
+func invalidCronFieldError(t, field string) error {
+	return cronParseError(fmt.Sprintf("invalid %s field %s", t, field))
 }
 
 // NowNano returns the current Unix time in nanoseconds.
