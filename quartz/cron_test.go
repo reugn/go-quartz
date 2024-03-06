@@ -136,6 +136,19 @@ func TestCronExpressionMixedStringRange(t *testing.T) {
 	assert.Equal(t, result, "Sat May 6 00:00:00 2023")
 }
 
+func TestCronExpressionStepWithRange(t *testing.T) {
+	prev := time.Date(2024, 1, 1, 12, 00, 00, 00, time.UTC).UnixNano()
+	cronTrigger, err := quartz.NewCronTrigger("0 0 5-11/2 * * *")
+	assert.IsNil(t, err)
+	result, _ := iterate(prev, cronTrigger, 10)
+	assert.Equal(t, result, "Thu Jan 4 07:00:00 2024")
+
+	cronTrigger, err = quartz.NewCronTrigger("0 0 1,5-11/3 * * *")
+	assert.IsNil(t, err)
+	result, _ = iterate(prev, cronTrigger, 10)
+	assert.Equal(t, result, "Thu Jan 4 05:00:00 2024")
+}
+
 func TestCronExpressionExpired(t *testing.T) {
 	prev := time.Date(2023, 4, 22, 12, 00, 00, 00, time.UTC).UnixNano()
 	cronTrigger, err := quartz.NewCronTrigger("0 0 0 1 1 ? 2023")

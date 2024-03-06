@@ -205,9 +205,9 @@ func buildCronField(tokens []string) ([]*cronField, error) {
 }
 
 func parseField(field string, min, max int, translate ...[]string) (*cronField, error) {
-	var dict []string
+	var glossary []string
 	if len(translate) > 0 {
-		dict = translate[0]
+		glossary = translate[0]
 	}
 
 	// any value
@@ -221,50 +221,56 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 		if inScope(i, min, max) {
 			return &cronField{[]int{i}}, nil
 		}
-		return nil, cronParseError("simple field min/max validation")
+		return nil, invalidCronFieldError("simple", field)
 	}
 
 	// list values
 	if strings.Contains(field, ",") {
-		return parseListField(field, min, max, dict)
-	}
-
-	// range values
-	if strings.Contains(field, "-") {
-		return parseRangeField(field, min, max, dict)
+		return parseListField(field, min, max, glossary)
 	}
 
 	// step values
 	if strings.Contains(field, "/") {
-		return parseStepField(field, min, max, dict)
+		return parseStepField(field, min, max, glossary)
+	}
+
+	// range values
+	if strings.Contains(field, "-") {
+		return parseRangeField(field, min, max, glossary)
 	}
 
 	// simple literal value
-	if dict != nil {
-		i := intVal(dict, field)
-		if i >= 0 {
-			if inScope(i, min, max) {
-				return &cronField{[]int{i}}, nil
-			}
-			return nil, cronParseError("simple literal min/max validation")
+	if glossary != nil {
+		intVal, err := translateLiteral(glossary, field)
+		if err != nil {
+			return nil, err
 		}
+		if inScope(intVal, min, max) {
+			return &cronField{[]int{intVal}}, nil
+		}
+		return nil, invalidCronFieldError("literal", field)
 	}
 
 	return nil, cronParseError("parse error")
 }
 
-func parseListField(field string, min, max int, translate []string) (*cronField, error) {
+func parseListField(field string, min, max int, glossary []string) (*cronField, error) {
 	t := strings.Split(field, ",")
-	values, rangeValues := extractRangeValues(t)
-	listValues, err := sliceAtoi(values)
+	values, stepValues := extractStepValues(t)
+	values, rangeValues := extractRangeValues(values)
+	listValues, err := translateLiterals(glossary, values)
 	if err != nil {
-		listValues, err = indexes(values, translate)
+		return nil, err
+	}
+	for _, v := range stepValues {
+		stepField, err := parseStepField(v, min, max, glossary)
 		if err != nil {
 			return nil, err
 		}
+		listValues = append(listValues, stepField.values...)
 	}
 	for _, v := range rangeValues {
-		rangeField, err := parseRangeField(v, min, max, translate)
+		rangeField, err := parseRangeField(v, min, max, glossary)
 		if err != nil {
 			return nil, err
 		}
@@ -275,18 +281,22 @@ func parseListField(field string, min, max int, translate []string) (*cronField,
 	return &cronField{listValues}, nil
 }
 
-func parseRangeField(field string, min, max int, translate []string) (*cronField, error) {
+func parseRangeField(field string, min, max int, glossary []string) (*cronField, error) {
 	t := strings.Split(field, "-")
 	if len(t) != 2 {
-		return nil, cronParseError(fmt.Sprintf("invalid range field %s", field))
+		return nil, invalidCronFieldError("range", field)
 	}
-
-	from := normalize(t[0], translate)
-	to := normalize(t[1], translate)
+	from, err := normalize(t[0], glossary)
+	if err != nil {
+		return nil, err
+	}
+	to, err := normalize(t[1], glossary)
+	if err != nil {
+		return nil, err
+	}
 	if !inScope(from, min, max) || !inScope(to, min, max) {
-		return nil, cronParseError(fmt.Sprintf("range field min/max validation %d-%d", from, to))
+		return nil, invalidCronFieldError("range", field)
 	}
-
 	rangeValues, err := fillRangeValues(from, to)
 	if err != nil {
 		return nil, err
@@ -295,22 +305,46 @@ func parseRangeField(field string, min, max int, translate []string) (*cronField
 	return &cronField{rangeValues}, nil
 }
 
-func parseStepField(field string, min, max int, translate []string) (*cronField, error) {
+func parseStepField(field string, min, max int, glossary []string) (*cronField, error) {
 	t := strings.Split(field, "/")
 	if len(t) != 2 {
-		return nil, cronParseError(fmt.Sprintf("invalid step field %s", field))
+		return nil, invalidCronFieldError("step", field)
 	}
-	if t[0] == "*" {
-		t[0] = strconv.Itoa(min)
+	to := max
+	var (
+		from int
+		err  error
+	)
+	switch {
+	case t[0] == "*":
+		from = min
+	case strings.Contains(t[0], "-"):
+		trange := strings.Split(t[0], "-")
+		if len(trange) != 2 {
+			return nil, invalidCronFieldError("step", field)
+		}
+		from, err = normalize(trange[0], glossary)
+		if err != nil {
+			return nil, err
+		}
+		to, err = normalize(trange[1], glossary)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		from, err = normalize(t[0], glossary)
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	from := normalize(t[0], translate)
-	step := atoi(t[1])
-	if !inScope(from, min, max) {
-		return nil, cronParseError("step field min/max validation")
+	step, err := strconv.Atoi(t[1])
+	if err != nil {
+		return nil, invalidCronFieldError("step", field)
 	}
-
-	stepValues, err := fillStepValues(from, step, max)
+	if !inScope(from, min, max) || !inScope(step, 1, max) || !inScope(to, min, max) {
+		return nil, invalidCronFieldError("step", field)
+	}
+	stepValues, err := fillStepValues(from, step, to)
 	if err != nil {
 		return nil, err
 	}
