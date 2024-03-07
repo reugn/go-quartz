@@ -299,7 +299,27 @@ func iterate(prev int64, cronTrigger *quartz.CronTrigger, iterations int) (strin
 
 func TestCronExpressionError(t *testing.T) {
 	tests := []string{
+		"-1 * * * * *",
+		"X * * * * *",
+		"* X * * * *",
+		"* * X * * *",
+		"* * * X * *",
+		"* * * * X *",
+		"* * * * * X",
+		"* * * * * * X",
+		"1,X/1 * * * * *",
+		"1,X-1 * * * * *",
+		"1-2-3 * * * * *",
+		"X-2 * * * * *",
+		"1-X * * * * *",
+		"100-200 * * * * *",
+		"1/2/3 * * * * *",
+		"1-2-3/4 * * * * *",
+		"X-2/4 * * * * *",
+		"1-X/4 * * * * *",
+		"X/4 * * * * *",
 		"*/X * * * * *",
+		"200/100 * * * * *",
 	}
 	for _, test := range tests {
 		t.Run(test, func(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 	"github.com/reugn/go-quartz/internal/assert"
 	"github.com/reugn/go-quartz/internal/mock"
 	"github.com/reugn/go-quartz/job"
+	"github.com/reugn/go-quartz/matcher"
 	"github.com/reugn/go-quartz/quartz"
 )
 
@@ -307,6 +308,11 @@ func TestScheduler_JobWithRetries(t *testing.T) {
 	)
 	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.IsNil(t, err)
+	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
+	assert.ErrorIs(t, err, quartz.ErrIllegalState)
+	jobDetail.Options().Replace = true
+	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
+	assert.IsNil(t, err)
 
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusNA)
 	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
@@ -424,6 +430,10 @@ func TestScheduler_PauseResumeErrors(t *testing.T) {
 	assert.ErrorIs(t, err, quartz.ErrIllegalState)
 	err = sched.PauseJob(quartz.NewJobKey("funcJob2"))
 	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
+
+	assert.Equal(t, len(sched.GetJobKeys(matcher.JobPaused())), 1)
+	assert.Equal(t, len(sched.GetJobKeys(matcher.JobActive())), 0)
+	assert.Equal(t, len(sched.GetJobKeys()), 1)
 
 	sched.Stop()
 }
