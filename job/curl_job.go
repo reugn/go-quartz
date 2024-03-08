@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -69,7 +70,10 @@ func (cu *CurlJob) Description() string {
 func (cu *CurlJob) DumpResponse(body bool) ([]byte, error) {
 	cu.Lock()
 	defer cu.Unlock()
-	return httputil.DumpResponse(cu.response, body)
+	if cu.response != nil {
+		return httputil.DumpResponse(cu.response, body)
+	}
+	return nil, errors.New("response is nil")
 }
 
 // JobStatus returns the status of the CurlJob.
