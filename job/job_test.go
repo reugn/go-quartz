@@ -68,6 +68,7 @@ func TestMultipleExecution(t *testing.T) {
 
 	// check very often that we've only run one job
 	ticker := time.NewTicker(2 * time.Millisecond)
+loop:
 	for i := 0; i < 1000; i++ {
 		select {
 		case <-ticker.C:
@@ -76,7 +77,7 @@ func TestMultipleExecution(t *testing.T) {
 			}
 		case <-ctx.Done():
 			t.Error("should not have reached timeout")
-			break
+			break loop
 		}
 	}
 
@@ -122,7 +123,16 @@ func TestCurlJob(t *testing.T) {
 	}
 }
 
-func TestCurlJobDescription(t *testing.T) {
+func TestCurlJob_DumpResponse(t *testing.T) {
+	request, err := http.NewRequest(http.MethodGet, worldtimeapiURL, nil)
+	assert.IsNil(t, err)
+	httpJob := job.NewCurlJob(request)
+	response, err := httpJob.DumpResponse(false)
+	assert.IsNil(t, response)
+	assert.ErrorContains(t, err, "response is nil")
+}
+
+func TestCurlJob_Description(t *testing.T) {
 	postRequest, err := http.NewRequest(
 		http.MethodPost,
 		worldtimeapiURL,
