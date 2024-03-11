@@ -44,7 +44,7 @@ func (st *SimpleTrigger) Description() string {
 // This type of Trigger can only be fired once and will expire immediately.
 type RunOnceTrigger struct {
 	Delay   time.Duration
-	expired bool
+	Expired bool
 }
 
 // Verify RunOnceTrigger satisfies the Trigger interface.
@@ -53,17 +53,16 @@ var _ Trigger = (*RunOnceTrigger)(nil)
 // NewRunOnceTrigger returns a new RunOnceTrigger with the given delay time.
 func NewRunOnceTrigger(delay time.Duration) *RunOnceTrigger {
 	return &RunOnceTrigger{
-		Delay:   delay,
-		expired: false,
+		Delay: delay,
 	}
 }
 
 // NextFireTime returns the next time at which the RunOnceTrigger is scheduled to fire.
 // Sets expired to true afterwards.
 func (ot *RunOnceTrigger) NextFireTime(prev int64) (int64, error) {
-	if !ot.expired {
+	if !ot.Expired {
 		next := prev + ot.Delay.Nanoseconds()
-		ot.expired = true
+		ot.Expired = true
 		return next, nil
 	}
 
@@ -73,7 +72,7 @@ func (ot *RunOnceTrigger) NextFireTime(prev int64) (int64, error) {
 // Description returns the description of the trigger.
 func (ot *RunOnceTrigger) Description() string {
 	status := "valid"
-	if ot.expired {
+	if ot.Expired {
 		status = "expired"
 	}
 
