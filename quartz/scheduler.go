@@ -81,32 +81,37 @@ type StdScheduler struct {
 }
 
 type StdSchedulerOptions struct {
-	// When true, the scheduler will run jobs synchronously,
-	// waiting for each execution instance of the job to return
-	// before starting the next execution. Running with this
-	// option effectively serializes all job execution.
+	// When true, the scheduler will run jobs synchronously, waiting
+	// for each execution instance of the job to return before starting
+	// the next execution. Running with this option effectively serializes
+	// all job execution.
 	BlockingExecution bool
 
-	// When greater than 0, all jobs will be dispatched to a pool
-	// of goroutines of WorkerLimit size to limit the total number
-	// of processes usable by the Scheduler. If all worker threads
-	// are in use, job scheduling will wait till a job can be
-	// dispatched. If BlockingExecution is set, then WorkerLimit
-	// is ignored.
+	// When greater than 0, all jobs will be dispatched to a pool of
+	// goroutines of WorkerLimit size to limit the total number of processes
+	// usable by the scheduler. If all worker threads are in use, job
+	// scheduling will wait till a job can be dispatched.
+	// If BlockingExecution is set, then WorkerLimit is ignored.
 	WorkerLimit int
 
-	// When the scheduler attempts to schedule a job, if the job
-	// is due to run in less than or equal to this value, then the
-	// scheduler will run the job, even if the "next scheduled
-	// job" is in the future. Historically, Go-Quartz had a
-	// scheduled time of 30 seconds, by default (NewStdScheduler)
-	// has a threshold of 100ms (if a job will be "triggered" in
-	// 100ms, then it is run now.)
+	// When the scheduler attempts to execute a job, if the time elapsed
+	// since the job's scheduled execution time is less than or equal to the
+	// configured threshold, the scheduler will execute the job.
+	// Otherwise, the job will be rescheduled as outdated. By default,
+	// NewStdScheduler sets the threshold to 100ms.
 	//
 	// As a rule of thumb, your OutdatedThreshold should always be
 	// greater than 0, but less than the shortest interval used by
 	// your job or jobs.
 	OutdatedThreshold time.Duration
+
+	// This retry interval will be used if the scheduler fails to
+	// calculate the next time to interrupt for job execution. By default,
+	// the NewStdScheduler constructor sets this interval to 100
+	// milliseconds. Changing the default value may be beneficial when
+	// using a custom implementation of the JobQueue, where operations
+	// may timeout or fail.
+	RetryInterval time.Duration
 }
 
 // Verify StdScheduler satisfies the Scheduler interface.
@@ -117,6 +122,7 @@ var _ Scheduler = (*StdScheduler)(nil)
 func NewStdScheduler() Scheduler {
 	return NewStdSchedulerWithOptions(StdSchedulerOptions{
 		OutdatedThreshold: 100 * time.Millisecond,
+		RetryInterval:     100 * time.Millisecond,
 	}, nil)
 }
 
@@ -426,27 +432,25 @@ func (sched *StdScheduler) startWorkers(ctx context.Context) {
 }
 
 func (sched *StdScheduler) calculateNextTick() time.Duration {
-	if sched.queue.Size() > 0 {
-		scheduledJob, err := sched.queue.Head()
-		if err != nil {
-			if errors.Is(err, ErrQueueEmpty) {
-				logger.Debug("Queue is empty")
-			} else {
-				logger.Warnf("Failed to calculate next tick: %s", err)
-			}
-		} else {
-			var nextTickDuration time.Duration
-			nextRunTime := scheduledJob.NextRunTime()
-			now := NowNano()
-			if nextRunTime > now {
-				nextTickDuration = time.Duration(nextRunTime - now)
-			}
-			logger.Tracef("Next tick is for %s in %s.", scheduledJob.JobDetail().jobKey,
-				nextTickDuration)
+	var nextTickDuration time.Duration
+	scheduledJob, err := sched.queue.Head()
+	if err != nil {
+		if errors.Is(err, ErrQueueEmpty) {
+			logger.Debug("Queue is empty")
 			return nextTickDuration
 		}
+		logger.Warnf("Failed to calculate next tick: %s", err)
+		return sched.opts.RetryInterval
 	}
-	return sched.opts.OutdatedThreshold
+	nextRunTime := scheduledJob.NextRunTime()
+	now := NowNano()
+	if nextRunTime > now {
+		nextTickDuration = time.Duration(nextRunTime - now)
+	}
+	logger.Tracef("Next tick is for %s in %s.", scheduledJob.JobDetail().jobKey,
+		nextTickDuration)
+
+	return nextTickDuration
 }
 
 func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
