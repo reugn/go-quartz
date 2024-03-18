@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+const (
+	listRune  = ','
+	stepRune  = '/'
+	rangeRune = '-'
+)
+
 // Sep is the serialization delimiter; the default is a double colon.
 var Sep = "::"
 
@@ -26,7 +32,7 @@ func extractRangeValues(parsed []string) ([]string, []string) {
 	values := make([]string, 0, len(parsed))
 	rangeValues := make([]string, 0)
 	for _, v := range parsed {
-		if strings.Contains(v, "-") { // range value
+		if strings.ContainsRune(v, rangeRune) { // range value
 			rangeValues = append(rangeValues, v)
 		} else {
 			values = append(values, v)
@@ -39,7 +45,7 @@ func extractStepValues(parsed []string) ([]string, []string) {
 	values := make([]string, 0, len(parsed))
 	stepValues := make([]string, 0)
 	for _, v := range parsed {
-		if strings.Contains(v, "/") { // step value
+		if strings.ContainsRune(v, stepRune) { // step value
 			stepValues = append(stepValues, v)
 		} else {
 			values = append(values, v)
@@ -54,7 +60,6 @@ func fillRangeValues(from, to int) ([]int, error) {
 	}
 	length := (to - from) + 1
 	rangeValues := make([]int, length)
-
 	for i, j := from, 0; i <= to; i, j = i+1, j+1 {
 		rangeValues[j] = i
 	}
@@ -67,7 +72,6 @@ func fillStepValues(from, step, max int) ([]int, error) {
 	}
 	length := ((max - from) / step) + 1
 	stepValues := make([]int, length)
-
 	for i, j := from, 0; i <= max; i, j = i+step, j+1 {
 		stepValues[j] = i
 	}
