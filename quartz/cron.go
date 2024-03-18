@@ -47,20 +47,17 @@ func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTri
 	if location == nil {
 		return nil, illegalArgumentError("location is nil")
 	}
-
 	expression = trimCronExpression(expression)
 	fields, err := parseCronExpression(expression)
 	if err != nil {
 		return nil, err
 	}
-
 	lastDefined := -1
 	for i, field := range fields {
 		if len(field.values) > 0 {
 			lastDefined = i
 		}
 	}
-
 	// full wildcard expression
 	if lastDefined == -1 {
 		fields[0].values, _ = fillRangeValues(0, 59)
@@ -165,37 +162,38 @@ func trimCronExpression(expression string) string {
 func buildCronField(tokens []string) ([]*cronField, error) {
 	var err error
 	fields := make([]*cronField, 7)
+	// second field
 	fields[0], err = parseField(tokens[0], 0, 59)
 	if err != nil {
 		return nil, err
 	}
-
+	// minute field
 	fields[1], err = parseField(tokens[1], 0, 59)
 	if err != nil {
 		return nil, err
 	}
-
+	// hour field
 	fields[2], err = parseField(tokens[2], 0, 23)
 	if err != nil {
 		return nil, err
 	}
-
+	// day-of-month field
 	fields[3], err = parseField(tokens[3], 1, 31)
 	if err != nil {
 		return nil, err
 	}
-
+	// month field
 	fields[4], err = parseField(tokens[4], 1, 12, months)
 	if err != nil {
 		return nil, err
 	}
-
+	// day-of-week field
 	fields[5], err = parseField(tokens[5], 1, 7, days)
 	if err != nil {
 		return nil, err
 	}
 	fields[5].add(-1)
-
+	// year field
 	fields[6], err = parseField(tokens[6], 1970, 1970*2)
 	if err != nil {
 		return nil, err
@@ -209,12 +207,10 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 	if len(translate) > 0 {
 		glossary = translate[0]
 	}
-
 	// any value
 	if field == "*" || field == "?" {
 		return &cronField{[]int{}}, nil
 	}
-
 	// simple value
 	i, err := strconv.Atoi(field)
 	if err == nil {
@@ -223,22 +219,18 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 		}
 		return nil, invalidCronFieldError("simple", field)
 	}
-
 	// list values
-	if strings.Contains(field, ",") {
+	if strings.ContainsRune(field, listRune) {
 		return parseListField(field, min, max, glossary)
 	}
-
 	// step values
-	if strings.Contains(field, "/") {
+	if strings.ContainsRune(field, stepRune) {
 		return parseStepField(field, min, max, glossary)
 	}
-
 	// range values
-	if strings.Contains(field, "-") {
+	if strings.ContainsRune(field, rangeRune) {
 		return parseRangeField(field, min, max, glossary)
 	}
-
 	// simple literal value
 	if glossary != nil {
 		intVal, err := translateLiteral(glossary, field)
@@ -251,11 +243,11 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 		return nil, invalidCronFieldError("literal", field)
 	}
 
-	return nil, cronParseError("parse error")
+	return nil, cronParseError(fmt.Sprintf("invalid field %s", field))
 }
 
 func parseListField(field string, min, max int, glossary []string) (*cronField, error) {
-	t := strings.Split(field, ",")
+	t := strings.Split(field, string(listRune))
 	values, stepValues := extractStepValues(t)
 	values, rangeValues := extractRangeValues(values)
 	listValues, err := translateLiterals(glossary, values)
@@ -282,7 +274,7 @@ func parseListField(field string, min, max int, glossary []string) (*cronField, 
 }
 
 func parseRangeField(field string, min, max int, glossary []string) (*cronField, error) {
-	t := strings.Split(field, "-")
+	t := strings.Split(field, string(rangeRune))
 	if len(t) != 2 {
 		return nil, invalidCronFieldError("range", field)
 	}
@@ -306,7 +298,7 @@ func parseRangeField(field string, min, max int, glossary []string) (*cronField,
 }
 
 func parseStepField(field string, min, max int, glossary []string) (*cronField, error) {
-	t := strings.Split(field, "/")
+	t := strings.Split(field, string(stepRune))
 	if len(t) != 2 {
 		return nil, invalidCronFieldError("step", field)
 	}
@@ -318,8 +310,8 @@ func parseStepField(field string, min, max int, glossary []string) (*cronField, 
 	switch {
 	case t[0] == "*":
 		from = min
-	case strings.Contains(t[0], "-"):
-		trange := strings.Split(t[0], "-")
+	case strings.ContainsRune(t[0], rangeRune):
+		trange := strings.Split(t[0], string(rangeRune))
 		if len(trange) != 2 {
 			return nil, invalidCronFieldError("step", field)
 		}
