@@ -220,10 +220,11 @@ func TestScheduler_Cancel(t *testing.T) {
 			startingRoutines := runtime.NumGoroutine()
 
 			sched := quartz.NewStdScheduler()
-
 			sched.Start(ctx)
+
+			time.Sleep(5 * time.Millisecond)
 			noopRoutines := runtime.NumGoroutine()
-			if startingRoutines > noopRoutines {
+			if startingRoutines >= noopRoutines {
 				t.Error("should have started more threads",
 					startingRoutines,
 					noopRoutines,
@@ -268,6 +269,7 @@ func TestScheduler_Cancel(t *testing.T) {
 				t.Fatal("waiting timed out before resources were released", err)
 			}
 
+			time.Sleep(5 * time.Millisecond)
 			endingRoutines := runtime.NumGoroutine()
 			if endingRoutines >= runningRoutines {
 				t.Error("number of routines should decrease after wait",
