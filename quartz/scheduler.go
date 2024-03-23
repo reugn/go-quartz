@@ -454,12 +454,6 @@ func (sched *StdScheduler) calculateNextTick() time.Duration {
 }
 
 func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
-	// return if the job queue is empty
-	if sched.queue.Size() == 0 {
-		logger.Debug("Job queue is empty.")
-		return
-	}
-
 	// fetch a job for processing
 	scheduled, valid := sched.fetchAndReschedule()
 
@@ -533,7 +527,11 @@ func (sched *StdScheduler) fetchAndReschedule() (ScheduledJob, bool) {
 	// fetch a job for processing
 	job, err := sched.queue.Pop()
 	if err != nil {
-		logger.Errorf("Failed to fetch a job from the queue: %s", err)
+		if errors.Is(err, ErrQueueEmpty) {
+			logger.Debug("Queue is empty")
+		} else {
+			logger.Errorf("Failed to fetch a job from the queue: %s", err)
+		}
 		return nil, false
 	}
 	// validate the job
