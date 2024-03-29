@@ -42,7 +42,13 @@ func main() {
 	}, jobQueue)
 	scheduler.Start(ctx)
 
-	if jobQueue.Size() == 0 {
+	jobQueueSize, err := jobQueue.Size()
+	if err != nil {
+		logger.Errorf("Failed to fetch job queue size: %s", err)
+		return
+	}
+
+	if jobQueueSize == 0 {
 		logger.Info("Scheduling new jobs")
 		jobDetail1 := quartz.NewJobDetail(&printJob{5}, quartz.NewJobKey("job1"))
 		if err := scheduler.ScheduleJob(jobDetail1, quartz.NewSimpleTrigger(5*time.Second)); err != nil {
@@ -58,7 +64,11 @@ func main() {
 
 	<-ctx.Done()
 
-	scheduledJobs := jobQueue.ScheduledJobs(nil)
+	scheduledJobs, err := jobQueue.ScheduledJobs(nil)
+	if err != nil {
+		logger.Errorf("Failed to fetch scheduled jobs: %s", err)
+		return
+	}
 	jobNames := make([]string, 0, len(scheduledJobs))
 	for _, job := range scheduledJobs {
 		jobNames = append(jobNames, job.JobDetail().JobKey().String())
@@ -289,14 +299,16 @@ func (jq *jobQueue) Remove(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 }
 
 // ScheduledJobs returns the slice of all scheduled jobs in the queue.
-func (jq *jobQueue) ScheduledJobs(matchers []quartz.Matcher[quartz.ScheduledJob]) []quartz.ScheduledJob {
+func (jq *jobQueue) ScheduledJobs(
+	matchers []quartz.Matcher[quartz.ScheduledJob],
+) ([]quartz.ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
 	logger.Trace("ScheduledJobs")
 	var jobs []quartz.ScheduledJob
 	fileInfo, err := os.ReadDir(dataFolder)
 	if err != nil {
-		return jobs
+		return nil, err
 	}
 	for _, file := range fileInfo {
 		if !file.IsDir() {
@@ -309,7 +321,7 @@ func (jq *jobQueue) ScheduledJobs(matchers []quartz.Matcher[quartz.ScheduledJob]
 			}
 		}
 	}
-	return jobs
+	return jobs, nil
 }
 
 func isMatch(job quartz.ScheduledJob, matchers []quartz.Matcher[quartz.ScheduledJob]) bool {
@@ -323,12 +335,15 @@ func isMatch(job quartz.ScheduledJob, matchers []quartz.Matcher[quartz.Scheduled
 }
 
 // Size returns the size of the job queue.
-func (jq *jobQueue) Size() int {
+func (jq *jobQueue) Size() (int, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
 	logger.Trace("Size")
-	files, _ := os.ReadDir(dataFolder)
-	return len(files)
+	files, err := os.ReadDir(dataFolder)
+	if err != nil {
+		return 0, err
+	}
+	return len(files), nil
 }
 
 // Clear clears the job queue.
