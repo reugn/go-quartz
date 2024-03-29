@@ -239,7 +239,7 @@ func (sched *StdScheduler) GetJobKeys(matchers ...Matcher[ScheduledJob]) []*JobK
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 
-	scheduledJobs := sched.queue.ScheduledJobs(matchers)
+	scheduledJobs, _ := sched.queue.ScheduledJobs(matchers)
 	keys := make([]*JobKey, 0, len(scheduledJobs))
 	for _, scheduled := range scheduledJobs {
 		keys = append(keys, scheduled.JobDetail().jobKey)
@@ -382,31 +382,33 @@ func (sched *StdScheduler) Stop() {
 
 func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 	defer sched.wg.Done()
+	maxTimerDuration := time.Duration(1<<63 - 1)
+	timer := time.NewTimer(maxTimerDuration)
 	for {
-		if sched.queue.Size() == 0 {
-			select {
-			case <-sched.interrupt:
-				logger.Trace("Interrupted in empty queue.")
-			case <-ctx.Done():
-				logger.Info("Exit the empty execution loop.")
-				return
-			}
-		} else {
-			timer := time.NewTimer(sched.calculateNextTick())
-			select {
-			case <-timer.C:
-				logger.Trace("Tick.")
-				sched.executeAndReschedule(ctx)
+		queueSize, err := sched.queue.Size()
+		switch {
+		case err != nil:
+			logger.Errorf("Failed to fetch queue size: %s", err)
+			timer.Reset(sched.opts.RetryInterval)
+		case queueSize == 0:
+			logger.Trace("Queue is empty.")
+			timer.Reset(maxTimerDuration)
+		default:
+			timer.Reset(sched.calculateNextTick())
+		}
+		select {
+		case <-timer.C:
+			logger.Trace("Tick.")
+			sched.executeAndReschedule(ctx)
 
-			case <-sched.interrupt:
-				logger.Trace("Interrupted waiting for next tick.")
-				timer.Stop()
+		case <-sched.interrupt:
+			logger.Trace("Interrupted waiting for next tick.")
+			timer.Stop()
 
-			case <-ctx.Done():
-				logger.Info("Exit the execution loop.")
-				timer.Stop()
-				return
-			}
+		case <-ctx.Done():
+			logger.Info("Exit the execution loop.")
+			timer.Stop()
+			return
 		}
 	}
 }
@@ -439,7 +441,7 @@ func (sched *StdScheduler) calculateNextTick() time.Duration {
 			logger.Debug("Queue is empty")
 			return nextTickDuration
 		}
-		logger.Warnf("Failed to calculate next tick: %s", err)
+		logger.Errorf("Failed to calculate next tick: %s", err)
 		return sched.opts.RetryInterval
 	}
 	nextRunTime := scheduledJob.NextRunTime()

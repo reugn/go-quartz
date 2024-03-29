@@ -46,9 +46,11 @@ type JobQueue interface {
 	Push(job ScheduledJob) error
 
 	// Pop removes and returns the next to run scheduled job from the queue.
+	// Implementations should return quartz.ErrQueueEmpty if the queue is empty.
 	Pop() (ScheduledJob, error)
 
 	// Head returns the first scheduled job without removing it from the queue.
+	// Implementations should return quartz.ErrQueueEmpty if the queue is empty.
 	Head() (ScheduledJob, error)
 
 	// Get returns the scheduled job with the specified key without removing it
@@ -75,10 +77,10 @@ type JobQueue interface {
 	//			// ... WHERE group_name = m.Pattern
 	//		}
 	//	}
-	ScheduledJobs([]Matcher[ScheduledJob]) []ScheduledJob
+	ScheduledJobs([]Matcher[ScheduledJob]) ([]ScheduledJob, error)
 
 	// Size returns the size of the job queue.
-	Size() int
+	Size() (int, error)
 
 	// Clear clears the job queue.
 	Clear() error
@@ -212,11 +214,11 @@ func (jq *jobQueue) Remove(jobKey *JobKey) (ScheduledJob, error) {
 // ScheduledJobs returns a slice of scheduled jobs in the queue.
 // For a job to be returned, it must satisfy all of the specified matchers.
 // Given an empty matchers it returns all scheduled jobs.
-func (jq *jobQueue) ScheduledJobs(matchers []Matcher[ScheduledJob]) []ScheduledJob {
+func (jq *jobQueue) ScheduledJobs(matchers []Matcher[ScheduledJob]) ([]ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
 	if len(matchers) == 0 {
-		return jq.scheduledJobs()
+		return jq.scheduledJobs(), nil
 	}
 	matchedJobs := make([]ScheduledJob, 0)
 JobLoop:
@@ -229,7 +231,7 @@ JobLoop:
 		}
 		matchedJobs = append(matchedJobs, job)
 	}
-	return matchedJobs
+	return matchedJobs, nil
 }
 
 // scheduledJobs returns all scheduled jobs.
@@ -242,10 +244,10 @@ func (jq *jobQueue) scheduledJobs() []ScheduledJob {
 }
 
 // Size returns the size of the job queue.
-func (jq *jobQueue) Size() int {
+func (jq *jobQueue) Size() (int, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	return len(jq.delegate)
+	return len(jq.delegate), nil
 }
 
 // Clear clears the job queue.
