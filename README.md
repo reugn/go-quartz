@@ -32,7 +32,7 @@ type Scheduler interface {
 	// For a job key to be returned, the job must satisfy all of the
 	// matchers specified.
 	// Given no matchers, it returns the keys of all scheduled jobs.
-	GetJobKeys(...Matcher[ScheduledJob]) []*JobKey
+	GetJobKeys(...Matcher[ScheduledJob]) ([]*JobKey, error)
 
 	// GetScheduledJob returns the scheduled job with the specified key.
 	GetScheduledJob(jobKey *JobKey) (ScheduledJob, error)

@@ -38,7 +38,7 @@ type Scheduler interface {
 	// For a job key to be returned, the job must satisfy all of the
 	// matchers specified.
 	// Given no matchers, it returns the keys of all scheduled jobs.
-	GetJobKeys(...Matcher[ScheduledJob]) []*JobKey
+	GetJobKeys(...Matcher[ScheduledJob]) ([]*JobKey, error)
 
 	// GetScheduledJob returns the scheduled job with the specified key.
 	GetScheduledJob(jobKey *JobKey) (ScheduledJob, error)
@@ -235,16 +235,19 @@ func (sched *StdScheduler) IsStarted() bool {
 // GetJobKeys returns the keys of scheduled jobs.
 // For a job key to be returned, the job must satisfy all of the matchers specified.
 // Given no matchers, it returns the keys of all scheduled jobs.
-func (sched *StdScheduler) GetJobKeys(matchers ...Matcher[ScheduledJob]) []*JobKey {
+func (sched *StdScheduler) GetJobKeys(matchers ...Matcher[ScheduledJob]) ([]*JobKey, error) {
 	sched.mtx.Lock()
 	defer sched.mtx.Unlock()
 
-	scheduledJobs, _ := sched.queue.ScheduledJobs(matchers)
+	scheduledJobs, err := sched.queue.ScheduledJobs(matchers)
+	if err != nil {
+		return nil, err
+	}
 	keys := make([]*JobKey, 0, len(scheduledJobs))
 	for _, scheduled := range scheduledJobs {
 		keys = append(keys, scheduled.JobDetail().jobKey)
 	}
-	return keys
+	return keys, nil
 }
 
 // GetScheduledJob returns the ScheduledJob with the specified key.
