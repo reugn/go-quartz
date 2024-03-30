@@ -58,7 +58,8 @@ func TestScheduler(t *testing.T) {
 	assert.IsNil(t, err)
 
 	time.Sleep(time.Second)
-	scheduledJobKeys := sched.GetJobKeys()
+	scheduledJobKeys, err := sched.GetJobKeys()
+	assert.IsNil(t, err)
 	assert.Equal(t, scheduledJobKeys, []*quartz.JobKey{jobKeys[0], jobKeys[3]})
 
 	_, err = sched.GetScheduledJob(jobKeys[0])
@@ -74,12 +75,13 @@ func TestScheduler(t *testing.T) {
 	err = sched.DeleteJob(nonExistentJobKey)
 	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
 
-	scheduledJobKeys = sched.GetJobKeys()
+	scheduledJobKeys, err = sched.GetJobKeys()
+	assert.IsNil(t, err)
 	assert.Equal(t, len(scheduledJobKeys), 1)
 	assert.Equal(t, scheduledJobKeys, []*quartz.JobKey{jobKeys[3]})
 
 	_ = sched.Clear()
-	assert.Equal(t, len(sched.GetJobKeys()), 0)
+	assert.Equal(t, jobCount(sched), 0)
 	sched.Stop()
 	_, err = curlJob.DumpResponse(true)
 	assert.IsNil(t, err)
@@ -433,9 +435,9 @@ func TestScheduler_PauseResumeErrors(t *testing.T) {
 	err = sched.PauseJob(quartz.NewJobKey("funcJob2"))
 	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
 
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobPaused())), 1)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobActive())), 0)
-	assert.Equal(t, len(sched.GetJobKeys()), 1)
+	assert.Equal(t, jobCount(sched, matcher.JobPaused()), 1)
+	assert.Equal(t, jobCount(sched, matcher.JobActive()), 0)
+	assert.Equal(t, jobCount(sched), 1)
 
 	sched.Stop()
 }
@@ -483,4 +485,9 @@ func TestScheduler_StartStop(t *testing.T) {
 	sched.Stop()
 	sched.Stop()
 	assert.Equal(t, sched.IsStarted(), false)
+}
+
+func jobCount(sched quartz.Scheduler, matchers ...quartz.Matcher[quartz.ScheduledJob]) int {
+	keys, _ := sched.GetJobKeys(matchers...)
+	return len(keys)
 }

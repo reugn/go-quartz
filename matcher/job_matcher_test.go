@@ -32,40 +32,40 @@ func TestMatcher_JobAll(t *testing.T) {
 	}
 	sched.Start(context.Background())
 
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobActive())), 4)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobPaused())), 0)
+	assert.Equal(t, jobCount(sched, matcher.JobActive()), 4)
+	assert.Equal(t, jobCount(sched, matcher.JobPaused()), 0)
 
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobGroupEquals(quartz.DefaultGroup))), 2)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobGroupContains("_"))), 2)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobGroupStartsWith("group_"))), 2)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobGroupEndsWith("_update"))), 1)
+	assert.Equal(t, jobCount(sched, matcher.JobGroupEquals(quartz.DefaultGroup)), 2)
+	assert.Equal(t, jobCount(sched, matcher.JobGroupContains("_")), 2)
+	assert.Equal(t, jobCount(sched, matcher.JobGroupStartsWith("group_")), 2)
+	assert.Equal(t, jobCount(sched, matcher.JobGroupEndsWith("_update")), 1)
 
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobNameEquals("job_monitor"))), 2)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobNameContains("_"))), 4)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobNameStartsWith("job_"))), 4)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobNameEndsWith("_update"))), 2)
+	assert.Equal(t, jobCount(sched, matcher.JobNameEquals("job_monitor")), 2)
+	assert.Equal(t, jobCount(sched, matcher.JobNameContains("_")), 4)
+	assert.Equal(t, jobCount(sched, matcher.JobNameStartsWith("job_")), 4)
+	assert.Equal(t, jobCount(sched, matcher.JobNameEndsWith("_update")), 2)
 
 	// multiple matchers
-	assert.Equal(t, len(sched.GetJobKeys(
+	assert.Equal(t, jobCount(sched,
 		matcher.JobNameEquals("job_monitor"),
 		matcher.JobGroupEquals(quartz.DefaultGroup),
 		matcher.JobActive(),
-	)), 1)
+	), 1)
 
-	assert.Equal(t, len(sched.GetJobKeys(
+	assert.Equal(t, jobCount(sched,
 		matcher.JobNameEquals("job_monitor"),
 		matcher.JobGroupEquals(quartz.DefaultGroup),
 		matcher.JobPaused(),
-	)), 0)
+	), 0)
 
 	// no matchers
-	assert.Equal(t, len(sched.GetJobKeys()), 4)
+	assert.Equal(t, jobCount(sched), 4)
 
 	err = sched.PauseJob(quartz.NewJobKey("job_monitor"))
 	assert.IsNil(t, err)
 
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobActive())), 3)
-	assert.Equal(t, len(sched.GetJobKeys(matcher.JobPaused())), 1)
+	assert.Equal(t, jobCount(sched, matcher.JobActive()), 3)
+	assert.Equal(t, jobCount(sched, matcher.JobPaused()), 1)
 
 	sched.Stop()
 }
@@ -111,4 +111,9 @@ func TestMatcher_JobSwitchType(t *testing.T) {
 func TestMatcher_CustomStringOperator(t *testing.T) {
 	var op matcher.StringOperator = func(_, _ string) bool { return true }
 	assert.NotEqual(t, matcher.NewJobGroup(&op, "group1"), nil)
+}
+
+func jobCount(sched quartz.Scheduler, matchers ...quartz.Matcher[quartz.ScheduledJob]) int {
+	keys, _ := sched.GetJobKeys(matchers...)
+	return len(keys)
 }
