@@ -112,6 +112,14 @@ type StdSchedulerOptions struct {
 	// using a custom implementation of the JobQueue, where operations
 	// may timeout or fail.
 	RetryInterval time.Duration
+
+	// MisfiredChan allows the creation of event listeners to handle jobs that
+	// have failed to be executed on time and have been skipped by the scheduler.
+	//
+	// Misfires can occur due to insufficient resources or scheduler downtime.
+	// Adjust OutdatedThreshold to establish an acceptable delay time and
+	// ensure regular job execution.
+	MisfiredChan chan ScheduledJob
 }
 
 // Verify StdScheduler satisfies the Scheduler interface.
@@ -516,7 +524,11 @@ func (sched *StdScheduler) validateJob(job ScheduledJob) (bool, func() (int64, e
 	now := NowNano()
 	if job.NextRunTime() < now-sched.opts.OutdatedThreshold.Nanoseconds() {
 		duration := time.Duration(now - job.NextRunTime())
-		logger.Debugf("Job %s skipped as outdated %s.", job.JobDetail().jobKey, duration)
+		logger.Debugf("Job %s is outdated %s.", job.JobDetail().jobKey, duration)
+		select {
+		case sched.opts.MisfiredChan <- job:
+		default:
+		}
 		return false, func() (int64, error) { return job.Trigger().NextFireTime(now) }
 	} else if job.NextRunTime() > now {
 		logger.Debugf("Job %s is not due to run yet.", job.JobDetail().jobKey)
