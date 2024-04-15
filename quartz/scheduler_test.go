@@ -382,6 +382,32 @@ func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
 	sched.Stop()
 }
 
+func TestScheduler_MisfiredJob(t *testing.T) {
+	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
+		time.Sleep(20 * time.Millisecond)
+		return "ok", nil
+	})
+
+	misfiredChan := make(chan quartz.ScheduledJob, 1)
+	sched := quartz.NewStdSchedulerWithOptions(quartz.StdSchedulerOptions{
+		BlockingExecution: true,
+		OutdatedThreshold: time.Millisecond,
+		RetryInterval:     time.Millisecond,
+		MisfiredChan:      misfiredChan,
+	}, nil)
+
+	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
+	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(2*time.Millisecond))
+	assert.IsNil(t, err)
+
+	sched.Start(context.Background())
+
+	job := <-misfiredChan
+	assert.Equal(t, job.JobDetail().JobKey().Name(), "funcJob")
+
+	sched.Stop()
+}
+
 func TestScheduler_PauseResume(t *testing.T) {
 	var n int32
 	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
