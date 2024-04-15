@@ -524,7 +524,7 @@ func (sched *StdScheduler) validateJob(job ScheduledJob) (bool, func() (int64, e
 	now := NowNano()
 	if job.NextRunTime() < now-sched.opts.OutdatedThreshold.Nanoseconds() {
 		duration := time.Duration(now - job.NextRunTime())
-		logger.Debugf("Job %s is outdated %s.", job.JobDetail().jobKey, duration)
+		logger.Infof("Job %s is outdated %s.", job.JobDetail().jobKey, duration)
 		select {
 		case sched.opts.MisfiredChan <- job:
 		default:
