@@ -493,6 +493,13 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 }
 
 func executeWithRetries(ctx context.Context, jobDetail *JobDetail) {
+	// recover from unhandled panics that may occur during job execution
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Errorf("Job %s panicked: %s", jobDetail.jobKey, err)
+		}
+	}()
+
 	err := jobDetail.job.Execute(ctx)
 	if err == nil {
 		return

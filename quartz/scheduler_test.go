@@ -408,6 +408,32 @@ func TestScheduler_MisfiredJob(t *testing.T) {
 	sched.Stop()
 }
 
+func TestScheduler_JobPanic(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Millisecond)
+	defer cancel()
+
+	var n int32
+	addJob := job.NewFunctionJob(func(_ context.Context) (int32, error) {
+		return atomic.AddInt32(&n, 1), nil
+	})
+	panicJob := job.NewFunctionJob(func(_ context.Context) (int32, error) {
+		panic("error")
+	})
+
+	sched := quartz.NewStdScheduler()
+	sched.Start(ctx)
+
+	addJobDetail := quartz.NewJobDetail(addJob, quartz.NewJobKey("addJob"))
+	err := sched.ScheduleJob(addJobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
+	assert.IsNil(t, err)
+	panicJobDetail := quartz.NewJobDetail(panicJob, quartz.NewJobKey("panicJob"))
+	err = sched.ScheduleJob(panicJobDetail, quartz.NewSimpleTrigger(15*time.Millisecond))
+	assert.IsNil(t, err)
+
+	sched.Wait(ctx)
+	assert.Equal(t, int(atomic.LoadInt32(&n)), 3)
+}
+
 func TestScheduler_PauseResume(t *testing.T) {
 	var n int32
 	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
