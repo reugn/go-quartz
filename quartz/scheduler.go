@@ -193,7 +193,7 @@ func (sched *StdScheduler) ScheduleJob(
 	if err == nil {
 		logger.Debugf("Successfully added job %s.", jobDetail.jobKey)
 		if sched.started {
-			sched.reset()
+			sched.Reset()
 		}
 	}
 	return err
@@ -281,7 +281,7 @@ func (sched *StdScheduler) DeleteJob(jobKey *JobKey) error {
 	if err == nil {
 		logger.Debugf("Successfully deleted job %s.", jobKey)
 		if sched.started {
-			sched.reset()
+			sched.Reset()
 		}
 	}
 	return err
@@ -315,7 +315,7 @@ func (sched *StdScheduler) PauseJob(jobKey *JobKey) error {
 		if err == nil {
 			logger.Debugf("Successfully paused job %s.", jobKey)
 			if sched.started {
-				sched.reset()
+				sched.Reset()
 			}
 		}
 	}
@@ -353,7 +353,7 @@ func (sched *StdScheduler) ResumeJob(jobKey *JobKey) error {
 		if err == nil {
 			logger.Debugf("Successfully resumed job %s.", jobKey)
 			if sched.started {
-				sched.reset()
+				sched.Reset()
 			}
 		}
 	}
@@ -370,7 +370,7 @@ func (sched *StdScheduler) Clear() error {
 	if err == nil {
 		logger.Debug("Successfully cleared job queue.")
 		if sched.started {
-			sched.reset()
+			sched.Reset()
 		}
 	}
 	return err
@@ -577,13 +577,17 @@ func (sched *StdScheduler) fetchAndReschedule() (ScheduledJob, bool) {
 			toSchedule.JobDetail().jobKey, err)
 	} else {
 		logger.Tracef("Successfully rescheduled job %s", toSchedule.JobDetail().jobKey)
-		sched.reset()
+		sched.Reset()
 	}
 
 	return job, valid
 }
 
-func (sched *StdScheduler) reset() {
+// Reset is called internally to recalculate the closest job timing when there
+// is an update to the job queue by the scheduler. In cluster mode with a shared
+// queue, it can be triggered manually to synchronize with remote changes if one
+// of the schedulers fails.
+func (sched *StdScheduler) Reset() {
 	select {
 	case sched.interrupt <- struct{}{}:
 	default:
