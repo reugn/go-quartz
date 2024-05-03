@@ -110,7 +110,7 @@ func TestScheduler_BlockingSemantics(t *testing.T) {
 
 			opts.OutdatedThreshold = 10 * time.Millisecond
 
-			sched := quartz.NewStdSchedulerWithOptions(opts, nil)
+			sched := quartz.NewStdSchedulerWithOptions(opts, nil, nil)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			sched.Start(ctx)
@@ -394,7 +394,7 @@ func TestScheduler_MisfiredJob(t *testing.T) {
 		OutdatedThreshold: time.Millisecond,
 		RetryInterval:     time.Millisecond,
 		MisfiredChan:      misfiredChan,
-	}, nil)
+	}, nil, nil)
 
 	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
 	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(2*time.Millisecond))
