@@ -39,7 +39,7 @@ func main() {
 	jobQueue := newJobQueue()
 	scheduler := quartz.NewStdSchedulerWithOptions(quartz.StdSchedulerOptions{
 		OutdatedThreshold: time.Second, // considering file system I/O latency
-	}, jobQueue)
+	}, jobQueue, nil)
 	scheduler.Start(ctx)
 
 	jobQueueSize, err := jobQueue.Size()
