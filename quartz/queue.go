@@ -137,8 +137,8 @@ type jobQueue struct {
 
 var _ JobQueue = (*jobQueue)(nil)
 
-// newJobQueue initializes and returns an empty jobQueue.
-func newJobQueue() *jobQueue {
+// NewJobQueue initializes and returns an empty jobQueue.
+func NewJobQueue() JobQueue {
 	return &jobQueue{
 		delegate: priorityQueue{},
 	}
