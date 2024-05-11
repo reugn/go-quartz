@@ -149,7 +149,7 @@ func NewStdSchedulerWithOptions(
 	jobQueueMtx sync.Locker,
 ) *StdScheduler {
 	if jobQueue == nil {
-		jobQueue = newJobQueue()
+		jobQueue = NewJobQueue()
 	}
 	if jobQueueMtx == nil {
 		jobQueueMtx = &sync.Mutex{}
