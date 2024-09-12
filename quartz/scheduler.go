@@ -433,7 +433,7 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 }
 
 func (sched *StdScheduler) startWorkers(ctx context.Context) {
-	if sched.opts.WorkerLimit > 0 {
+	if !sched.opts.BlockingExecution && sched.opts.WorkerLimit > 0 {
 		logger.Debugf("Starting %d scheduler workers.", sched.opts.WorkerLimit)
 		for i := 0; i < sched.opts.WorkerLimit; i++ {
 			sched.wg.Add(1)
