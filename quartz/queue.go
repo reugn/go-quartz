@@ -12,7 +12,6 @@ type scheduledJob struct {
 	job      *JobDetail
 	trigger  Trigger
 	priority int64 // job priority, backed by its next run time.
-	index    int   // maintained by the heap.Interface methods.
 }
 
 var _ ScheduledJob = (*scheduledJob)(nil)
@@ -104,16 +103,12 @@ func (pq priorityQueue) Less(i, j int) bool {
 // Swap exchanges the indexes of the items.
 func (pq priorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
-	pq[i].index = i
-	pq[j].index = j
 }
 
 // Push implements the heap.Interface.Push.
 // Adds an element at index Len().
 func (pq *priorityQueue) Push(element interface{}) {
-	index := len(*pq)
 	item := element.(*scheduledJob)
-	item.index = index
 	*pq = append(*pq, item)
 }
 
@@ -123,7 +118,6 @@ func (pq *priorityQueue) Pop() interface{} {
 	old := *pq
 	n := len(old)
 	item := old[n-1]
-	item.index = -1 // for safety
 	*pq = old[0 : n-1]
 	return item
 }
