@@ -2,7 +2,6 @@ package quartz
 
 import (
 	"container/heap"
-	"fmt"
 	"sync"
 )
 
@@ -16,7 +15,7 @@ type scheduledJob struct {
 
 var _ ScheduledJob = (*scheduledJob)(nil)
 
-// Job returns the scheduled job instance.
+// JobDetail returns the details of the scheduled job.
 func (scheduled *scheduledJob) JobDetail() *JobDetail {
 	return scheduled.job
 }
@@ -45,11 +44,13 @@ type JobQueue interface {
 	Push(job ScheduledJob) error
 
 	// Pop removes and returns the next to run scheduled job from the queue.
-	// Implementations should return quartz.ErrQueueEmpty if the queue is empty.
+	// Implementations should return an error wrapping [ErrQueueEmpty] if the
+	// queue is empty.
 	Pop() (ScheduledJob, error)
 
 	// Head returns the first scheduled job without removing it from the queue.
-	// Implementations should return quartz.ErrQueueEmpty if the queue is empty.
+	// Implementations should return an error wrapping [ErrQueueEmpty] if the
+	// queue is empty.
 	Head() (ScheduledJob, error)
 
 	// Get returns the scheduled job with the specified key without removing it
@@ -61,7 +62,7 @@ type JobQueue interface {
 
 	// ScheduledJobs returns a slice of scheduled jobs in the queue.
 	// The matchers parameter acts as a filter to build the resulting list.
-	// For a job to be returned in the result slice, it must satisfy all of the
+	// For a job to be returned in the result slice, it must satisfy all the
 	// specified matchers. Empty matchers return all scheduled jobs in the queue.
 	//
 	// Custom queue implementations may consider using pattern matching on the
@@ -151,8 +152,7 @@ func (jq *jobQueue) Push(job ScheduledJob) error {
 				heap.Remove(&jq.delegate, i)
 				break
 			}
-			return illegalStateError(fmt.Sprintf("job with the key %s already exists",
-				job.JobDetail().jobKey))
+			return newIllegalStateError(ErrJobAlreadyExists)
 		}
 	}
 	heap.Push(&jq.delegate, job)
@@ -164,7 +164,7 @@ func (jq *jobQueue) Pop() (ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
 	if len(jq.delegate) == 0 {
-		return nil, ErrQueueEmpty
+		return nil, newIllegalStateError(ErrQueueEmpty)
 	}
 	return heap.Pop(&jq.delegate).(ScheduledJob), nil
 }
@@ -174,7 +174,7 @@ func (jq *jobQueue) Head() (ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
 	if len(jq.delegate) == 0 {
-		return nil, ErrQueueEmpty
+		return nil, newIllegalStateError(ErrQueueEmpty)
 	}
 	return jq.delegate[0], nil
 }
@@ -189,7 +189,7 @@ func (jq *jobQueue) Get(jobKey *JobKey) (ScheduledJob, error) {
 			return scheduled, nil
 		}
 	}
-	return nil, jobNotFoundError(jobKey.String())
+	return nil, newIllegalStateError(ErrJobNotFound)
 }
 
 // Remove removes and returns the scheduled job with the specified key.
@@ -202,11 +202,11 @@ func (jq *jobQueue) Remove(jobKey *JobKey) (ScheduledJob, error) {
 			return heap.Remove(&jq.delegate, i).(ScheduledJob), nil
 		}
 	}
-	return nil, jobNotFoundError(jobKey.String())
+	return nil, newIllegalStateError(ErrJobNotFound)
 }
 
 // ScheduledJobs returns a slice of scheduled jobs in the queue.
-// For a job to be returned, it must satisfy all of the specified matchers.
+// For a job to be returned, it must satisfy all the specified matchers.
 // Given an empty matchers it returns all scheduled jobs.
 func (jq *jobQueue) ScheduledJobs(matchers []Matcher[ScheduledJob]) ([]ScheduledJob, error) {
 	jq.mtx.Lock()

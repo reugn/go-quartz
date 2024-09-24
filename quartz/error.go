@@ -8,33 +8,30 @@ import (
 // Errors
 var (
 	ErrIllegalArgument = errors.New("illegal argument")
-	ErrIllegalState    = errors.New("illegal state")
 	ErrCronParse       = errors.New("parse cron expression")
-	ErrJobNotFound     = errors.New("job not found")
-	ErrQueueEmpty      = errors.New("queue is empty")
 	ErrTriggerExpired  = errors.New("trigger has expired")
+
+	ErrIllegalState     = errors.New("illegal state")
+	ErrQueueEmpty       = errors.New("queue is empty")
+	ErrJobNotFound      = errors.New("job not found")
+	ErrJobAlreadyExists = errors.New("job already exists")
+	ErrJobIsSuspended   = errors.New("job is suspended")
+	ErrJobIsActive      = errors.New("job is active")
 )
 
-// illegalArgumentError returns an illegal argument error with a custom
+// newIllegalArgumentError returns an illegal argument error with a custom
 // error message, which unwraps to ErrIllegalArgument.
-func illegalArgumentError(message string) error {
+func newIllegalArgumentError(message string) error {
 	return fmt.Errorf("%w: %s", ErrIllegalArgument, message)
 }
 
-// illegalStateError returns an illegal state error with a custom
-// error message, which unwraps to ErrIllegalState.
-func illegalStateError(message string) error {
-	return fmt.Errorf("%w: %s", ErrIllegalState, message)
-}
-
-// cronParseError returns a cron parse error with a custom error message,
+// newCronParseError returns a cron parse error with a custom error message,
 // which unwraps to ErrCronParse.
-func cronParseError(message string) error {
+func newCronParseError(message string) error {
 	return fmt.Errorf("%w: %s", ErrCronParse, message)
 }
 
-// jobNotFoundError returns a job not found error with a custom error message,
-// which unwraps to ErrJobNotFound.
-func jobNotFoundError(message string) error {
-	return fmt.Errorf("%w: %s", ErrJobNotFound, message)
+// newIllegalStateError returns an illegal state error specifying it with err.
+func newIllegalStateError(err error) error {
+	return fmt.Errorf("%w: %w", ErrIllegalState, err)
 }
