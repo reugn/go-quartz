@@ -3,7 +3,6 @@ package quartz
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -170,16 +169,16 @@ func (sched *StdScheduler) ScheduleJob(
 	trigger Trigger,
 ) error {
 	if jobDetail == nil {
-		return illegalArgumentError("jobDetail is nil")
+		return newIllegalArgumentError("jobDetail is nil")
 	}
 	if jobDetail.jobKey == nil {
-		return illegalArgumentError("jobDetail.jobKey is nil")
+		return newIllegalArgumentError("jobDetail.jobKey is nil")
 	}
 	if jobDetail.jobKey.name == "" {
-		return illegalArgumentError("empty key name is not allowed")
+		return newIllegalArgumentError("empty key name is not allowed")
 	}
 	if trigger == nil {
-		return illegalArgumentError("trigger is nil")
+		return newIllegalArgumentError("trigger is nil")
 	}
 
 	nextRunTime := int64(math.MaxInt64)
@@ -271,7 +270,7 @@ func (sched *StdScheduler) GetJobKeys(matchers ...Matcher[ScheduledJob]) ([]*Job
 // GetScheduledJob returns the ScheduledJob with the specified key.
 func (sched *StdScheduler) GetScheduledJob(jobKey *JobKey) (ScheduledJob, error) {
 	if jobKey == nil {
-		return nil, illegalArgumentError("jobKey is nil")
+		return nil, newIllegalArgumentError("jobKey is nil")
 	}
 
 	sched.queueMtx.Lock()
@@ -283,7 +282,7 @@ func (sched *StdScheduler) GetScheduledJob(jobKey *JobKey) (ScheduledJob, error)
 // DeleteJob removes the Job with the specified key if present.
 func (sched *StdScheduler) DeleteJob(jobKey *JobKey) error {
 	if jobKey == nil {
-		return illegalArgumentError("jobKey is nil")
+		return newIllegalArgumentError("jobKey is nil")
 	}
 
 	sched.queueMtx.Lock()
@@ -303,7 +302,7 @@ func (sched *StdScheduler) DeleteJob(jobKey *JobKey) error {
 // executed by the scheduler.
 func (sched *StdScheduler) PauseJob(jobKey *JobKey) error {
 	if jobKey == nil {
-		return illegalArgumentError("jobKey is nil")
+		return newIllegalArgumentError("jobKey is nil")
 	}
 
 	sched.queueMtx.Lock()
@@ -314,7 +313,7 @@ func (sched *StdScheduler) PauseJob(jobKey *JobKey) error {
 		return err
 	}
 	if job.JobDetail().opts.Suspended {
-		return illegalStateError(fmt.Sprintf("job %s is suspended", jobKey))
+		return newIllegalStateError(ErrJobIsSuspended)
 	}
 
 	job, err = sched.queue.Remove(jobKey)
@@ -338,7 +337,7 @@ func (sched *StdScheduler) PauseJob(jobKey *JobKey) error {
 // ResumeJob restarts the suspended job with the specified key.
 func (sched *StdScheduler) ResumeJob(jobKey *JobKey) error {
 	if jobKey == nil {
-		return illegalArgumentError("jobKey is nil")
+		return newIllegalArgumentError("jobKey is nil")
 	}
 
 	sched.queueMtx.Lock()
@@ -349,7 +348,7 @@ func (sched *StdScheduler) ResumeJob(jobKey *JobKey) error {
 		return err
 	}
 	if !job.JobDetail().opts.Suspended {
-		return illegalStateError(fmt.Sprintf("job %s is active", jobKey))
+		return newIllegalStateError(ErrJobIsActive)
 	}
 
 	job, err = sched.queue.Remove(jobKey)

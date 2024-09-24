@@ -314,6 +314,7 @@ func TestScheduler_JobWithRetries(t *testing.T) {
 	assert.IsNil(t, err)
 	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.ErrorIs(t, err, quartz.ErrIllegalState)
+	assert.ErrorIs(t, err, quartz.ErrJobAlreadyExists)
 	jobDetail.Options().Replace = true
 	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.IsNil(t, err)
@@ -402,8 +403,8 @@ func TestScheduler_MisfiredJob(t *testing.T) {
 
 	sched.Start(context.Background())
 
-	job := <-misfiredChan
-	assert.Equal(t, job.JobDetail().JobKey().Name(), "funcJob")
+	misfired := <-misfiredChan
+	assert.Equal(t, misfired.JobDetail().JobKey().Name(), "funcJob")
 
 	sched.Stop()
 }
@@ -477,6 +478,7 @@ func TestScheduler_PauseResumeErrors(t *testing.T) {
 
 	err = sched.ResumeJob(jobDetail.JobKey())
 	assert.ErrorIs(t, err, quartz.ErrIllegalState)
+	assert.ErrorIs(t, err, quartz.ErrJobIsActive)
 	err = sched.ResumeJob(quartz.NewJobKey("funcJob2"))
 	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
 
@@ -484,6 +486,7 @@ func TestScheduler_PauseResumeErrors(t *testing.T) {
 	assert.IsNil(t, err)
 	err = sched.PauseJob(jobDetail.JobKey())
 	assert.ErrorIs(t, err, quartz.ErrIllegalState)
+	assert.ErrorIs(t, err, quartz.ErrJobIsSuspended)
 	err = sched.PauseJob(quartz.NewJobKey("funcJob2"))
 	assert.ErrorIs(t, err, quartz.ErrJobNotFound)
 
@@ -496,20 +499,20 @@ func TestScheduler_PauseResumeErrors(t *testing.T) {
 
 func TestScheduler_ArgumentValidationErrors(t *testing.T) {
 	sched := quartz.NewStdScheduler()
-	job := job.NewShellJob("ls -la")
+	j := job.NewShellJob("ls -la")
 	trigger := quartz.NewRunOnceTrigger(time.Millisecond)
 	expiredTrigger, err := quartz.NewCronTrigger("0 0 0 1 1 ? 2023")
 	assert.IsNil(t, err)
 
 	err = sched.ScheduleJob(nil, trigger)
 	assert.ErrorContains(t, err, "jobDetail is nil")
-	err = sched.ScheduleJob(quartz.NewJobDetail(job, nil), trigger)
+	err = sched.ScheduleJob(quartz.NewJobDetail(j, nil), trigger)
 	assert.ErrorContains(t, err, "jobDetail.jobKey is nil")
-	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKey("")), trigger)
+	err = sched.ScheduleJob(quartz.NewJobDetail(j, quartz.NewJobKey("")), trigger)
 	assert.ErrorContains(t, err, "empty key name is not allowed")
-	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKeyWithGroup("job", "")), nil)
+	err = sched.ScheduleJob(quartz.NewJobDetail(j, quartz.NewJobKeyWithGroup("job", "")), nil)
 	assert.ErrorContains(t, err, "trigger is nil")
-	err = sched.ScheduleJob(quartz.NewJobDetail(job, quartz.NewJobKey("job")), expiredTrigger)
+	err = sched.ScheduleJob(quartz.NewJobDetail(j, quartz.NewJobKey("job")), expiredTrigger)
 	assert.ErrorIs(t, err, quartz.ErrTriggerExpired)
 
 	err = sched.DeleteJob(nil)

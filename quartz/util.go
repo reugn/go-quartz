@@ -56,7 +56,7 @@ func extractStepValues(parsed []string) ([]string, []string) {
 
 func fillRangeValues(from, to int) ([]int, error) {
 	if to < from {
-		return nil, cronParseError("fill range values")
+		return nil, newCronParseError("fill range values")
 	}
 	length := (to - from) + 1
 	rangeValues := make([]int, length)
@@ -68,7 +68,7 @@ func fillRangeValues(from, to int) ([]int, error) {
 
 func fillStepValues(from, step, max int) ([]int, error) {
 	if max < from || step == 0 {
-		return nil, cronParseError("fill step values")
+		return nil, newCronParseError("fill step values")
 	}
 	length := ((max - from) / step) + 1
 	stepValues := make([]int, length)
@@ -100,11 +100,11 @@ func translateLiteral(glossary []string, literal string) (int, error) {
 			return i, nil
 		}
 	}
-	return 0, cronParseError(fmt.Sprintf("unknown literal %s", literal))
+	return 0, newCronParseError(fmt.Sprintf("unknown literal %s", literal))
 }
 
-func invalidCronFieldError(t, field string) error {
-	return cronParseError(fmt.Sprintf("invalid %s field %s", t, field))
+func newInvalidCronFieldError(t, field string) error {
+	return newCronParseError(fmt.Sprintf("invalid %s field %s", t, field))
 }
 
 // NowNano returns the current Unix time in nanoseconds.

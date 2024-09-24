@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// CronTrigger implements the quartz.Trigger interface.
+// CronTrigger implements the [Trigger] interface.
 // Used to fire a Job at given moments in time, defined with Unix 'cron-like' schedule definitions.
 //
 // Examples:
@@ -37,15 +37,15 @@ type CronTrigger struct {
 // Verify CronTrigger satisfies the Trigger interface.
 var _ Trigger = (*CronTrigger)(nil)
 
-// NewCronTrigger returns a new CronTrigger using the UTC location.
+// NewCronTrigger returns a new [CronTrigger] using the UTC location.
 func NewCronTrigger(expression string) (*CronTrigger, error) {
 	return NewCronTriggerWithLoc(expression, time.UTC)
 }
 
-// NewCronTriggerWithLoc returns a new CronTrigger with the given time.Location.
+// NewCronTriggerWithLoc returns a new [CronTrigger] with the given [time.Location].
 func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTrigger, error) {
 	if location == nil {
-		return nil, illegalArgumentError("location is nil")
+		return nil, newIllegalArgumentError("location is nil")
 	}
 	expression = trimCronExpression(expression)
 	fields, err := parseCronExpression(expression)
@@ -141,13 +141,13 @@ func parseCronExpression(expression string) ([]*cronField, error) {
 	}
 	length := len(tokens)
 	if length < 6 || length > 7 {
-		return nil, cronParseError("invalid expression length")
+		return nil, newCronParseError("invalid expression length")
 	}
 	if length == 6 {
 		tokens = append(tokens, "*")
 	}
 	if (tokens[3] != "?" && tokens[3] != "*") && (tokens[5] != "?" && tokens[5] != "*") {
-		return nil, cronParseError("day field set twice")
+		return nil, newCronParseError("day field set twice")
 	}
 
 	return buildCronField(tokens)
@@ -217,7 +217,7 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 		if inScope(i, min, max) {
 			return &cronField{[]int{i}}, nil
 		}
-		return nil, invalidCronFieldError("simple", field)
+		return nil, newInvalidCronFieldError("simple", field)
 	}
 	// list values
 	if strings.ContainsRune(field, listRune) {
@@ -240,10 +240,10 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 		if inScope(intVal, min, max) {
 			return &cronField{[]int{intVal}}, nil
 		}
-		return nil, invalidCronFieldError("literal", field)
+		return nil, newInvalidCronFieldError("literal", field)
 	}
 
-	return nil, cronParseError(fmt.Sprintf("invalid field %s", field))
+	return nil, newCronParseError(fmt.Sprintf("invalid field %s", field))
 }
 
 func parseListField(field string, min, max int, glossary []string) (*cronField, error) {
@@ -276,7 +276,7 @@ func parseListField(field string, min, max int, glossary []string) (*cronField, 
 func parseRangeField(field string, min, max int, glossary []string) (*cronField, error) {
 	t := strings.Split(field, string(rangeRune))
 	if len(t) != 2 {
-		return nil, invalidCronFieldError("range", field)
+		return nil, newInvalidCronFieldError("range", field)
 	}
 	from, err := normalize(t[0], glossary)
 	if err != nil {
@@ -287,7 +287,7 @@ func parseRangeField(field string, min, max int, glossary []string) (*cronField,
 		return nil, err
 	}
 	if !inScope(from, min, max) || !inScope(to, min, max) {
-		return nil, invalidCronFieldError("range", field)
+		return nil, newInvalidCronFieldError("range", field)
 	}
 	rangeValues, err := fillRangeValues(from, to)
 	if err != nil {
@@ -300,7 +300,7 @@ func parseRangeField(field string, min, max int, glossary []string) (*cronField,
 func parseStepField(field string, min, max int, glossary []string) (*cronField, error) {
 	t := strings.Split(field, string(stepRune))
 	if len(t) != 2 {
-		return nil, invalidCronFieldError("step", field)
+		return nil, newInvalidCronFieldError("step", field)
 	}
 	to := max
 	var (
@@ -313,7 +313,7 @@ func parseStepField(field string, min, max int, glossary []string) (*cronField, 
 	case strings.ContainsRune(t[0], rangeRune):
 		trange := strings.Split(t[0], string(rangeRune))
 		if len(trange) != 2 {
-			return nil, invalidCronFieldError("step", field)
+			return nil, newInvalidCronFieldError("step", field)
 		}
 		from, err = normalize(trange[0], glossary)
 		if err != nil {
@@ -331,10 +331,10 @@ func parseStepField(field string, min, max int, glossary []string) (*cronField, 
 	}
 	step, err := strconv.Atoi(t[1])
 	if err != nil {
-		return nil, invalidCronFieldError("step", field)
+		return nil, newInvalidCronFieldError("step", field)
 	}
 	if !inScope(from, min, max) || !inScope(step, 1, max) || !inScope(to, min, max) {
-		return nil, invalidCronFieldError("step", field)
+		return nil, newInvalidCronFieldError("step", field)
 	}
 	stepValues, err := fillStepValues(from, step, to)
 	if err != nil {
