@@ -21,7 +21,7 @@ func TestMultipleExecution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	var n int64
-	job := job.NewIsolatedJob(job.NewFunctionJob(func(ctx context.Context) (bool, error) {
+	job1 := job.NewIsolatedJob(job.NewFunctionJob(func(ctx context.Context) (bool, error) {
 		atomic.AddInt64(&n, 1)
 		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
@@ -55,7 +55,7 @@ func TestMultipleExecution(t *testing.T) {
 				case <-timer.C:
 					// sleep for a jittered amount of
 					// time, less than 11ms
-					_ = job.Execute(ctx)
+					_ = job1.Execute(ctx)
 				case <-ctx.Done():
 					return
 				case <-sig:
@@ -66,7 +66,7 @@ func TestMultipleExecution(t *testing.T) {
 		}()
 	}
 
-	// check very often that we've only run one job
+	// confirm regularly that only a single job execution has occurred
 	ticker := time.NewTicker(2 * time.Millisecond)
 loop:
 	for i := 0; i < 1000; i++ {
@@ -81,8 +81,7 @@ loop:
 		}
 	}
 
-	// stop all of the adding threads without canceling
-	// the context
+	// stop all the adding threads without canceling the context
 	close(sig)
 	if atomic.LoadInt64(&n) != 1 {
 		t.Error("only one job should run")

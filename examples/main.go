@@ -94,7 +94,9 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 		return
 	}
 	curlJob := job.NewCurlJob(request)
-	functionJob := job.NewFunctionJobWithDesc("42", func(_ context.Context) (int, error) { return 42, nil })
+	functionJob := job.NewFunctionJobWithDesc(
+		func(_ context.Context) (int, error) { return 42, nil },
+		"42")
 
 	shellJobDetail := quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob"))
 	curlJobDetail := quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob"))
@@ -114,7 +116,7 @@ func sampleJobs(ctx context.Context, wg *sync.WaitGroup) {
 	} else {
 		fmt.Println(string(response))
 	}
-	fmt.Printf("Function job result: %v\n", *functionJob.Result())
+	fmt.Printf("Function job result: %v\n", functionJob.Result())
 
 	time.Sleep(time.Second * 2)
 	sched.Stop()

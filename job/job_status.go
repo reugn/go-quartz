@@ -7,9 +7,9 @@ const (
 	// StatusNA is the initial Job status.
 	StatusNA Status = iota
 
-	// StatusOK indicates the Job completed successfully.
+	// StatusOK indicates that the Job completed successfully.
 	StatusOK
 
-	// StatusFailure indicates the Job failed.
+	// StatusFailure indicates that the Job failed.
 	StatusFailure
 )
