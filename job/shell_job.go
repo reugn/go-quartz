@@ -11,10 +11,12 @@ import (
 	"github.com/reugn/go-quartz/quartz"
 )
 
-// ShellJob represents a shell command Job, implements the quartz.Job interface.
-// Be aware of runtime.GOOS when sending shell commands for execution.
+// ShellJob represents a shell command Job, implements the [quartz.Job] interface.
+// The command will be executed using bash if available; otherwise, sh will be used.
+// Consider the interpreter type and target environment when formulating commands
+// for execution.
 type ShellJob struct {
-	sync.Mutex
+	mtx       sync.Mutex
 	cmd       string
 	exitCode  int
 	stdout    string
@@ -25,7 +27,7 @@ type ShellJob struct {
 
 var _ quartz.Job = (*ShellJob)(nil)
 
-// NewShellJob returns a new ShellJob for the given command.
+// NewShellJob returns a new [ShellJob] for the given command.
 func NewShellJob(cmd string) *ShellJob {
 	return &ShellJob{
 		cmd:       cmd,
@@ -33,7 +35,7 @@ func NewShellJob(cmd string) *ShellJob {
 	}
 }
 
-// NewShellJobWithCallback returns a new ShellJob with the given callback function.
+// NewShellJobWithCallback returns a new [ShellJob] with the given callback function.
 func NewShellJobWithCallback(cmd string, f func(context.Context, *ShellJob)) *ShellJob {
 	return &ShellJob{
 		cmd:       cmd,
@@ -55,7 +57,7 @@ var (
 func getShell() string {
 	shellOnce.Do(func() {
 		_, err := exec.LookPath("/bin/bash")
-		// if not found bash binary, use `sh`.
+		// if bash binary is not found, use `sh`.
 		if err != nil {
 			shellPath = "sh"
 		}
@@ -72,11 +74,10 @@ func (sh *ShellJob) Execute(ctx context.Context) error {
 	cmd.Stdout = io.Writer(&stdout)
 	cmd.Stderr = io.Writer(&stderr)
 
-	err := cmd.Run()
+	err := cmd.Run() // run the command
 
-	sh.Lock()
-	sh.stdout = stdout.String()
-	sh.stderr = stderr.String()
+	sh.mtx.Lock()
+	sh.stdout, sh.stderr = stdout.String(), stderr.String()
 	sh.exitCode = cmd.ProcessState.ExitCode()
 
 	if err != nil {
@@ -84,38 +85,38 @@ func (sh *ShellJob) Execute(ctx context.Context) error {
 	} else {
 		sh.jobStatus = StatusOK
 	}
-	sh.Unlock()
+	sh.mtx.Unlock()
 
 	if sh.callback != nil {
 		sh.callback(ctx, sh)
 	}
-	return nil
+	return err
 }
 
 // ExitCode returns the exit code of the ShellJob.
 func (sh *ShellJob) ExitCode() int {
-	sh.Lock()
-	defer sh.Unlock()
+	sh.mtx.Lock()
+	defer sh.mtx.Unlock()
 	return sh.exitCode
 }
 
 // Stdout returns the captured stdout output of the ShellJob.
 func (sh *ShellJob) Stdout() string {
-	sh.Lock()
-	defer sh.Unlock()
+	sh.mtx.Lock()
+	defer sh.mtx.Unlock()
 	return sh.stdout
 }
 
 // Stderr returns the captured stderr output of the ShellJob.
 func (sh *ShellJob) Stderr() string {
-	sh.Lock()
-	defer sh.Unlock()
+	sh.mtx.Lock()
+	defer sh.mtx.Unlock()
 	return sh.stderr
 }
 
 // JobStatus returns the status of the ShellJob.
 func (sh *ShellJob) JobStatus() Status {
-	sh.Lock()
-	defer sh.Unlock()
+	sh.mtx.Lock()
+	defer sh.mtx.Unlock()
 	return sh.jobStatus
 }
