@@ -15,14 +15,14 @@ func TestFunctionJob(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var n int32 = 2
+	var n atomic.Int32
 	funcJob1 := job.NewFunctionJob(func(_ context.Context) (string, error) {
-		atomic.AddInt32(&n, 2)
+		n.Add(2)
 		return "fired1", nil
 	})
 
 	funcJob2 := job.NewFunctionJob(func(_ context.Context) (*int, error) {
-		atomic.AddInt32(&n, 2)
+		n.Add(2)
 		result := 42
 		return &result, nil
 	})
@@ -48,7 +48,7 @@ func TestFunctionJob(t *testing.T) {
 	assert.NotEqual(t, funcJob2.Result(), nil)
 	assert.Equal(t, *funcJob2.Result(), 42)
 
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 6)
+	assert.Equal(t, n.Load(), 4)
 }
 
 func TestNewFunctionJob_WithDesc(t *testing.T) {

@@ -115,10 +115,10 @@ func TestScheduler_BlockingSemantics(t *testing.T) {
 			defer cancel()
 			sched.Start(ctx)
 
-			var n int64
+			var n atomic.Int64
 			timerJob := quartz.NewJobDetail(
 				job.NewFunctionJob(func(ctx context.Context) (bool, error) {
-					atomic.AddInt64(&n, 1)
+					n.Add(1)
 					timer := time.NewTimer(time.Hour)
 					defer timer.Stop()
 					select {
@@ -139,7 +139,7 @@ func TestScheduler_BlockingSemantics(t *testing.T) {
 			}
 			ticker := time.NewTicker(100 * time.Millisecond)
 			<-ticker.C
-			if atomic.LoadInt64(&n) == 0 {
+			if n.Load() == 0 {
 				t.Error("job should have run at least once")
 			}
 
@@ -152,7 +152,7 @@ func TestScheduler_BlockingSemantics(t *testing.T) {
 					case <-ctx.Done():
 						break BLOCKING
 					case <-ticker.C:
-						num := atomic.LoadInt64(&n)
+						num := n.Load()
 						if num != 1 {
 							t.Error("job should have only run once", num)
 						}
@@ -166,7 +166,7 @@ func TestScheduler_BlockingSemantics(t *testing.T) {
 					case <-ctx.Done():
 						break NONBLOCKING
 					case <-ticker.C:
-						num := atomic.LoadInt64(&n)
+						num := n.Load()
 						if num <= lastN {
 							t.Errorf("on iter %d n did not increase %d",
 								iters, num,
@@ -182,7 +182,7 @@ func TestScheduler_BlockingSemantics(t *testing.T) {
 					case <-ctx.Done():
 						break WORKERS
 					case <-ticker.C:
-						num := atomic.LoadInt64(&n)
+						num := n.Load()
 						if num > int64(opts.WorkerLimit) {
 							t.Errorf("on iter %d n %d was more than limit %d",
 								iters, num, opts.WorkerLimit,
@@ -292,16 +292,16 @@ func TestScheduler_Cancel(t *testing.T) {
 }
 
 func TestScheduler_JobWithRetries(t *testing.T) {
-	var n int32
+	var n atomic.Int32
 	funcRetryJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
-		atomic.AddInt32(&n, 1)
-		if n < 3 {
+		if n.Add(1) < 3 {
 			return "", errors.New("less than 3")
 		}
 		return "ok", nil
 	})
 	ctx := context.Background()
 	sched := quartz.NewStdScheduler()
+
 	opts := quartz.NewDefaultJobDetailOptions()
 	opts.MaxRetries = 3
 	opts.RetryInterval = 50 * time.Millisecond
@@ -312,44 +312,46 @@ func TestScheduler_JobWithRetries(t *testing.T) {
 	)
 	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.IsNil(t, err)
+
 	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.ErrorIs(t, err, quartz.ErrIllegalState)
 	assert.ErrorIs(t, err, quartz.ErrJobAlreadyExists)
+
 	jobDetail.Options().Replace = true
 	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.IsNil(t, err)
 
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusNA)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
+	assert.Equal(t, n.Load(), 0)
 
 	sched.Start(ctx)
 
 	time.Sleep(25 * time.Millisecond)
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 1)
+	assert.Equal(t, n.Load(), 1)
 
 	time.Sleep(50 * time.Millisecond)
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 2)
+	assert.Equal(t, n.Load(), 2)
 
 	time.Sleep(100 * time.Millisecond)
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusOK)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 3)
+	assert.Equal(t, n.Load(), 3)
 
 	sched.Stop()
 }
 
 func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
-	var n int32
+	var n atomic.Int32
 	funcRetryJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
-		atomic.AddInt32(&n, 1)
-		if n < 3 {
+		if n.Add(1) < 3 {
 			return "", errors.New("less than 3")
 		}
 		return "ok", nil
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	sched := quartz.NewStdScheduler()
+
 	opts := quartz.NewDefaultJobDetailOptions()
 	opts.MaxRetries = 3
 	opts.RetryInterval = 50 * time.Millisecond
@@ -362,23 +364,23 @@ func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
 	assert.IsNil(t, err)
 
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusNA)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
+	assert.Equal(t, n.Load(), 0)
 
 	sched.Start(ctx)
 
 	time.Sleep(25 * time.Millisecond)
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 1)
+	assert.Equal(t, n.Load(), 1)
 
 	time.Sleep(50 * time.Millisecond)
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 2)
+	assert.Equal(t, n.Load(), 2)
 
 	cancel() // cancel the context after first retry
 
 	time.Sleep(100 * time.Millisecond)
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusFailure)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 2)
+	assert.Equal(t, n.Load(), 2)
 
 	sched.Stop()
 }
@@ -413,9 +415,9 @@ func TestScheduler_JobPanic(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Millisecond)
 	defer cancel()
 
-	var n int32
+	var n atomic.Int32
 	addJob := job.NewFunctionJob(func(_ context.Context) (int32, error) {
-		return atomic.AddInt32(&n, 1), nil
+		return n.Add(1), nil
 	})
 	panicJob := job.NewFunctionJob(func(_ context.Context) (int32, error) {
 		panic("error")
@@ -432,13 +434,13 @@ func TestScheduler_JobPanic(t *testing.T) {
 	assert.IsNil(t, err)
 
 	sched.Wait(ctx)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 3)
+	assert.Equal(t, n.Load(), 3)
 }
 
 func TestScheduler_PauseResume(t *testing.T) {
-	var n int32
+	var n atomic.Int32
 	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
-		atomic.AddInt32(&n, 1)
+		n.Add(1)
 		return "ok", nil
 	})
 	sched := quartz.NewStdScheduler()
@@ -446,23 +448,23 @@ func TestScheduler_PauseResume(t *testing.T) {
 	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
 	assert.IsNil(t, err)
 
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 0)
+	assert.Equal(t, n.Load(), 0)
 	sched.Start(context.Background())
 
 	time.Sleep(55 * time.Millisecond)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 5)
+	assert.Equal(t, n.Load(), 5)
 
 	err = sched.PauseJob(jobDetail.JobKey())
 	assert.IsNil(t, err)
 
 	time.Sleep(55 * time.Millisecond)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 5)
+	assert.Equal(t, n.Load(), 5)
 
 	err = sched.ResumeJob(jobDetail.JobKey())
 	assert.IsNil(t, err)
 
 	time.Sleep(55 * time.Millisecond)
-	assert.Equal(t, int(atomic.LoadInt32(&n)), 10)
+	assert.Equal(t, n.Load(), 10)
 
 	sched.Stop()
 }

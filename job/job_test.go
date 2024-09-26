@@ -20,9 +20,9 @@ import (
 func TestMultipleExecution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	var n int64
+	var n atomic.Int64
 	job1 := job.NewIsolatedJob(job.NewFunctionJob(func(ctx context.Context) (bool, error) {
-		atomic.AddInt64(&n, 1)
+		n.Add(1)
 		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
 		select {
@@ -72,7 +72,7 @@ loop:
 	for i := 0; i < 1000; i++ {
 		select {
 		case <-ticker.C:
-			if atomic.LoadInt64(&n) != 1 {
+			if n.Load() != 1 {
 				t.Error("only one job should run")
 			}
 		case <-ctx.Done():
@@ -83,7 +83,7 @@ loop:
 
 	// stop all the adding threads without canceling the context
 	close(sig)
-	if atomic.LoadInt64(&n) != 1 {
+	if n.Load() != 1 {
 		t.Error("only one job should run")
 	}
 }
@@ -222,7 +222,7 @@ func TestShellJob_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sh := job.NewShellJob(tt.args.Cmd)
-			_ = sh.Execute(context.TODO())
+			_ = sh.Execute(context.Background())
 
 			assert.Equal(t, tt.args.ExitCode, sh.ExitCode())
 			assert.Equal(t, tt.args.Stderr, sh.Stderr())
