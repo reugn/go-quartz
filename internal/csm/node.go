@@ -1,19 +1,18 @@
 package csm
 
 type csmNode interface {
-	// Returns the value held by the node.
+	// Value returns the value held by the node.
 	Value() int
 
-	// Resets the node value to the minimum valid value.
+	// Reset resets the node value to the minimum valid value.
 	Reset()
 
-	// Changes the node value to the next valid value.
-	// Returns true if the value overflowed and false otherwise.
+	// Next changes the node value to the next valid value.
+	// It returns true if the value overflowed and false otherwise.
 	Next() bool
 
-	// Checks if the current node value is valid.
+	// findForward checks if the current node value is valid.
 	// If it is not valid, find the next valid value.
-	// Returns true if the value changed and false otherwise.
 	findForward() result
 }
 
