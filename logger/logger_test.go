@@ -17,29 +17,29 @@ func TestSimpleLogger(t *testing.T) {
 	logger.SetDefault(logger.NewSimpleLogger(stdLogger, logger.LevelInfo))
 
 	logger.Trace("Trace")
-	assertEmpty(&b, t)
+	assertEmpty(t, &b)
 	logger.Tracef("Trace%s", "f")
-	assertEmpty(&b, t)
+	assertEmpty(t, &b)
 
 	logger.Debug("Debug")
-	assertEmpty(&b, t)
+	assertEmpty(t, &b)
 	logger.Debugf("Debug%s", "f")
-	assertEmpty(&b, t)
+	assertEmpty(t, &b)
 
 	logger.Info("Info")
-	assertNotEmpty(&b, t)
+	assertNotEmpty(t, &b)
 	logger.Infof("Info%s", "f")
-	assertNotEmpty(&b, t)
+	assertNotEmpty(t, &b)
 
 	logger.Warn("Warn")
-	assertNotEmpty(&b, t)
+	assertNotEmpty(t, &b)
 	logger.Warnf("Warn%s", "f")
-	assertNotEmpty(&b, t)
+	assertNotEmpty(t, &b)
 
 	logger.Error("Error")
-	assertNotEmpty(&b, t)
+	assertNotEmpty(t, &b)
 	logger.Errorf("Error%s", "f")
-	assertNotEmpty(&b, t)
+	assertNotEmpty(t, &b)
 }
 
 func TestLoggerOff(t *testing.T) {
@@ -51,9 +51,9 @@ func TestLoggerOff(t *testing.T) {
 		t.Fatal("logger.LevelError is enabled")
 	}
 	logger.Error("Error")
-	assertEmpty(&b, t)
+	assertEmpty(t, &b)
 	logger.Errorf("Error%s", "f")
-	assertEmpty(&b, t)
+	assertEmpty(t, &b)
 }
 
 func TestLoggerRace(t *testing.T) {
@@ -103,57 +103,61 @@ func TestLogFormat(t *testing.T) {
 
 	empty := struct{}{}
 	logr.Trace("Trace")
-	assertNotEmpty(&b, t)
+	assertNotEmpty(t, &b)
 	logr.Tracef("Tracef: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 	logger.Tracef("Tracef: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 
 	logr.Debug("Debug")
-	assertNotEmpty(&b, t)
+	assertNotEmpty(t, &b)
 	logr.Debugf("Debugf: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 	logger.Debugf("Debugf: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 
 	logr.Infof("Infof: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 	logger.Infof("Infof: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 
 	logr.Warnf("Warnf: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 	logger.Warnf("Warnf: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 
 	logr.Errorf("Errorf: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 	logger.Errorf("Errorf: %s, %d, %v, %v", "a", 1, true, empty)
-	checkLogFormat(&b, t)
+	checkLogFormat(t, &b)
 }
 
-func assertEmpty(r io.Reader, t *testing.T) {
-	logMsg := readAll(r, t)
+func assertEmpty(t *testing.T, r io.Reader) {
+	t.Helper()
+	logMsg := readAll(t, r)
 	if logMsg != "" {
 		t.Fatalf("log msg is not empty: %s", logMsg)
 	}
 }
 
-func assertNotEmpty(r io.Reader, t *testing.T) {
-	logMsg := readAll(r, t)
+func assertNotEmpty(t *testing.T, r io.Reader) {
+	t.Helper()
+	logMsg := readAll(t, r)
 	if logMsg == "" {
 		t.Fatal("log msg is empty")
 	}
 }
 
-func checkLogFormat(r io.Reader, t *testing.T) {
-	logMsg := readAll(r, t)
+func checkLogFormat(t *testing.T, r io.Reader) {
+	t.Helper()
+	logMsg := readAll(t, r)
 	if !strings.Contains(logMsg, "a, 1, true, {}") {
 		t.Fatalf("invalid log format: %s", logMsg)
 	}
 }
 
-func readAll(r io.Reader, t *testing.T) string {
+func readAll(t *testing.T, r io.Reader) string {
+	t.Helper()
 	bytes, err := io.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)

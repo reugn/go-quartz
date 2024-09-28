@@ -17,6 +17,7 @@ import (
 	"github.com/reugn/go-quartz/job"
 )
 
+//nolint:gosec
 func TestMultipleExecution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
