@@ -1,5 +1,5 @@
 run:
-  timeout: 1m
+  timeout: 2m
 
 linters:
   disable-all: true
@@ -8,7 +8,6 @@ linters:
     - errcheck
     - errname
     - errorlint
-    - exportloopref
     - funlen
     - gci
     - goconst
@@ -16,24 +15,32 @@ linters:
     - gocyclo
     - gofmt
     - goimports
+    - gosec
     - gosimple
     - govet
     - ineffassign
     - lll
     - misspell
+    - nolintlint
     - prealloc
     - revive
     - staticcheck
     - stylecheck
+    - thelper
+    - tparallel
     - typecheck
     - unconvert
     - unparam
     - unused
+    - whitespace
 
 linters-settings:
   errcheck:
     exclude-functions:
       - (*log.Logger).Output
+  thelper:
+    test:
+      begin: false
 
 issues:
   exclude-rules:
