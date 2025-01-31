@@ -600,6 +600,7 @@ func TestScheduler_OptionErrors(t *testing.T) {
 
 	opts := []quartz.SchedulerOpt{
 		quartz.WithWorkerLimit(-1),
+		quartz.WithMisfiredChan(nil),
 		quartz.WithQueue(nil, &sync.Mutex{}),
 		quartz.WithQueue(quartz.NewJobQueue(), nil),
 		quartz.WithLogger(nil),

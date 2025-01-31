@@ -9,7 +9,7 @@ import (
 	l "github.com/reugn/go-quartz/logger"
 )
 
-func TestSimpleLogger(t *testing.T) {
+func TestLogger_Simple(t *testing.T) {
 	var b bytes.Buffer
 	stdLogger := log.New(&b, "", log.LstdFlags)
 	logger := l.NewSimpleLogger(stdLogger, l.LevelInfo)
@@ -26,23 +26,47 @@ func TestSimpleLogger(t *testing.T) {
 	b.Reset()
 	assertEmpty(t, &b)
 
-	logger.Warn("Warn")
+	logger.Warn("Warn", "error", "err1")
 	assertNotEmpty(t, &b)
 
 	b.Reset()
 	assertEmpty(t, &b)
 
-	logger.Error("Error")
+	logger.Error("Error", "error")
+	assertNotEmpty(t, &b)
+
+	b.Reset()
+	assertEmpty(t, &b)
+
+	logger = l.NewSimpleLogger(stdLogger, l.LevelTrace)
+
+	logger.Trace("Trace")
+	assertNotEmpty(t, &b)
+
+	b.Reset()
+	assertEmpty(t, &b)
+
+	logger.Debug("Debug")
 	assertNotEmpty(t, &b)
 }
 
-func TestLoggerOff(t *testing.T) {
+func TestLogger_SimpleOff(t *testing.T) {
 	var b bytes.Buffer
 	stdLogger := log.New(&b, "", log.LstdFlags)
 	logger := l.NewSimpleLogger(stdLogger, l.LevelOff)
 
 	logger.Error("Error")
 	assertEmpty(t, &b)
+}
+
+func TestLogger_NoOp(t *testing.T) {
+	logger := l.NoOpLogger{}
+
+	logger.Trace("Trace")
+	logger.Debug("Debug")
+	logger.Info("Info")
+	logger.Warn("Warn")
+	logger.Error("Error")
 }
 
 func assertEmpty(t *testing.T, r io.Reader) {
