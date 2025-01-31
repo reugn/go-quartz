@@ -27,7 +27,9 @@ func TestFunctionJob(t *testing.T) {
 		return &result, nil
 	})
 
-	sched := quartz.NewStdScheduler()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
+
 	sched.Start(ctx)
 
 	assert.IsNil(t, sched.ScheduleJob(quartz.NewJobDetail(funcJob1,

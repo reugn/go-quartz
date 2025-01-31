@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,15 +16,25 @@ import (
 	"github.com/reugn/go-quartz/internal/assert"
 	"github.com/reugn/go-quartz/internal/mock"
 	"github.com/reugn/go-quartz/job"
+	"github.com/reugn/go-quartz/logger"
 	"github.com/reugn/go-quartz/matcher"
 	"github.com/reugn/go-quartz/quartz"
 )
 
 func TestScheduler(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sched := quartz.NewStdScheduler()
+	stdLogger := log.New(os.Stdout, "", log.LstdFlags|log.Lmsgprefix|log.Lshortfile)
+	l := logger.NewSimpleLogger(stdLogger, logger.LevelTrace)
+	sched, err := quartz.NewStdScheduler(
+		quartz.WithLogger(l),
+		quartz.WithQueue(quartz.NewJobQueue(), &sync.Mutex{}),
+	)
+	assert.IsNil(t, err)
+
 	var jobKeys [4]*quartz.JobKey
 
 	shellJob := job.NewShellJob("ls -la")
@@ -94,23 +107,32 @@ func TestScheduler(t *testing.T) {
 func TestScheduler_BlockingSemantics(t *testing.T) {
 	for _, tt := range []string{"Blocking", "NonBlocking", "WorkerSmall", "WorkerLarge"} {
 		t.Run(tt, func(t *testing.T) {
-			var opts quartz.StdSchedulerOptions
+			var (
+				workerLimit int
+				opt         quartz.SchedulerOpt
+			)
 			switch tt {
 			case "Blocking":
-				opts.BlockingExecution = true
+				opt = quartz.WithBlockingExecution()
 			case "NonBlocking":
-				opts.BlockingExecution = false
 			case "WorkerSmall":
-				opts.WorkerLimit = 4
+				workerLimit = 4
+				opt = quartz.WithWorkerLimit(workerLimit)
 			case "WorkerLarge":
-				opts.WorkerLimit = 16
+				workerLimit = 16
+				opt = quartz.WithWorkerLimit(workerLimit)
 			default:
 				t.Fatal("unknown semantic:", tt)
 			}
 
-			opts.OutdatedThreshold = 10 * time.Millisecond
+			opts := []quartz.SchedulerOpt{quartz.WithOutdatedThreshold(10 * time.Millisecond)}
+			if opt != nil {
+				opts = append(opts, opt)
+			}
 
-			sched := quartz.NewStdSchedulerWithOptions(opts, nil, nil)
+			sched, err := quartz.NewStdScheduler(opts...)
+			assert.IsNil(t, err)
+
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			sched.Start(ctx)
@@ -130,7 +152,7 @@ func TestScheduler_BlockingSemantics(t *testing.T) {
 				}),
 				quartz.NewJobKey("timerJob"),
 			)
-			err := sched.ScheduleJob(
+			err = sched.ScheduleJob(
 				timerJob,
 				quartz.NewSimpleTrigger(20*time.Millisecond),
 			)
@@ -183,9 +205,9 @@ func TestScheduler_BlockingSemantics(t *testing.T) {
 						break WORKERS
 					case <-ticker.C:
 						num := n.Load()
-						if num > int64(opts.WorkerLimit) {
+						if num > int64(workerLimit) {
 							t.Errorf("on iter %d n %d was more than limit %d",
-								iters, num, opts.WorkerLimit,
+								iters, num, workerLimit,
 							)
 						}
 					}
@@ -221,7 +243,8 @@ func TestScheduler_Cancel(t *testing.T) {
 
 			startingRoutines := runtime.NumGoroutine()
 
-			sched := quartz.NewStdScheduler()
+			sched, err := quartz.NewStdScheduler()
+			assert.IsNil(t, err)
 			sched.Start(ctx)
 
 			time.Sleep(5 * time.Millisecond)
@@ -292,6 +315,8 @@ func TestScheduler_Cancel(t *testing.T) {
 }
 
 func TestScheduler_JobWithRetries(t *testing.T) {
+	t.Parallel()
+
 	var n atomic.Int32
 	funcRetryJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
 		if n.Add(1) < 3 {
@@ -300,7 +325,8 @@ func TestScheduler_JobWithRetries(t *testing.T) {
 		return "ok", nil
 	})
 	ctx := context.Background()
-	sched := quartz.NewStdScheduler()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
 
 	opts := quartz.NewDefaultJobDetailOptions()
 	opts.MaxRetries = 3
@@ -310,7 +336,7 @@ func TestScheduler_JobWithRetries(t *testing.T) {
 		quartz.NewJobKey("funcRetryJob"),
 		opts,
 	)
-	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
+	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.IsNil(t, err)
 
 	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
@@ -342,6 +368,8 @@ func TestScheduler_JobWithRetries(t *testing.T) {
 }
 
 func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
+	t.Parallel()
+
 	var n atomic.Int32
 	funcRetryJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
 		if n.Add(1) < 3 {
@@ -350,7 +378,8 @@ func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
 		return "ok", nil
 	})
 	ctx, cancel := context.WithCancel(context.Background())
-	sched := quartz.NewStdScheduler()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
 
 	opts := quartz.NewDefaultJobDetailOptions()
 	opts.MaxRetries = 3
@@ -360,7 +389,7 @@ func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
 		quartz.NewJobKey("funcRetryJob"),
 		opts,
 	)
-	err := sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
+	err = sched.ScheduleJob(jobDetail, quartz.NewRunOnceTrigger(time.Millisecond))
 	assert.IsNil(t, err)
 
 	assert.Equal(t, funcRetryJob.JobStatus(), job.StatusNA)
@@ -386,21 +415,24 @@ func TestScheduler_JobWithRetriesCtxDone(t *testing.T) {
 }
 
 func TestScheduler_MisfiredJob(t *testing.T) {
+	t.Parallel()
+
 	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
 		time.Sleep(20 * time.Millisecond)
 		return "ok", nil
 	})
 
 	misfiredChan := make(chan quartz.ScheduledJob, 1)
-	sched := quartz.NewStdSchedulerWithOptions(quartz.StdSchedulerOptions{
-		BlockingExecution: true,
-		OutdatedThreshold: time.Millisecond,
-		RetryInterval:     time.Millisecond,
-		MisfiredChan:      misfiredChan,
-	}, nil, nil)
+	sched, err := quartz.NewStdScheduler(
+		quartz.WithBlockingExecution(),
+		quartz.WithOutdatedThreshold(time.Millisecond),
+		quartz.WithRetryInterval(time.Millisecond),
+		quartz.WithMisfiredChan(misfiredChan),
+	)
+	assert.IsNil(t, err)
 
 	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
-	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(2*time.Millisecond))
+	err = sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(2*time.Millisecond))
 	assert.IsNil(t, err)
 
 	sched.Start(context.Background())
@@ -412,6 +444,8 @@ func TestScheduler_MisfiredJob(t *testing.T) {
 }
 
 func TestScheduler_JobPanic(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Millisecond)
 	defer cancel()
 
@@ -423,11 +457,12 @@ func TestScheduler_JobPanic(t *testing.T) {
 		panic("error")
 	})
 
-	sched := quartz.NewStdScheduler()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
 	sched.Start(ctx)
 
 	addJobDetail := quartz.NewJobDetail(addJob, quartz.NewJobKey("addJob"))
-	err := sched.ScheduleJob(addJobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
+	err = sched.ScheduleJob(addJobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
 	assert.IsNil(t, err)
 	panicJobDetail := quartz.NewJobDetail(panicJob, quartz.NewJobKey("panicJob"))
 	err = sched.ScheduleJob(panicJobDetail, quartz.NewSimpleTrigger(15*time.Millisecond))
@@ -438,14 +473,18 @@ func TestScheduler_JobPanic(t *testing.T) {
 }
 
 func TestScheduler_PauseResume(t *testing.T) {
+	t.Parallel()
+
 	var n atomic.Int32
 	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
 		n.Add(1)
 		return "ok", nil
 	})
-	sched := quartz.NewStdScheduler()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
+
 	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
-	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
+	err = sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
 	assert.IsNil(t, err)
 
 	assert.Equal(t, n.Load(), 0)
@@ -470,12 +509,16 @@ func TestScheduler_PauseResume(t *testing.T) {
 }
 
 func TestScheduler_PauseResumeErrors(t *testing.T) {
+	t.Parallel()
+
 	funcJob := job.NewFunctionJob(func(_ context.Context) (string, error) {
 		return "ok", nil
 	})
-	sched := quartz.NewStdScheduler()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
+
 	jobDetail := quartz.NewJobDetail(funcJob, quartz.NewJobKey("funcJob"))
-	err := sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
+	err = sched.ScheduleJob(jobDetail, quartz.NewSimpleTrigger(10*time.Millisecond))
 	assert.IsNil(t, err)
 
 	err = sched.ResumeJob(jobDetail.JobKey())
@@ -500,7 +543,11 @@ func TestScheduler_PauseResumeErrors(t *testing.T) {
 }
 
 func TestScheduler_ArgumentValidationErrors(t *testing.T) {
-	sched := quartz.NewStdScheduler()
+	t.Parallel()
+
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
+
 	j := job.NewShellJob("ls -la")
 	trigger := quartz.NewRunOnceTrigger(time.Millisecond)
 	expiredTrigger, err := quartz.NewCronTrigger("0 0 0 1 1 ? 2023")
@@ -533,7 +580,11 @@ func TestScheduler_ArgumentValidationErrors(t *testing.T) {
 }
 
 func TestScheduler_StartStop(t *testing.T) {
-	sched := quartz.NewStdScheduler()
+	t.Parallel()
+
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
+
 	ctx := context.Background()
 	sched.Start(ctx)
 	sched.Start(ctx)
@@ -542,6 +593,22 @@ func TestScheduler_StartStop(t *testing.T) {
 	sched.Stop()
 	sched.Stop()
 	assert.Equal(t, sched.IsStarted(), false)
+}
+
+func TestScheduler_OptionErrors(t *testing.T) {
+	t.Parallel()
+
+	opts := []quartz.SchedulerOpt{
+		quartz.WithWorkerLimit(-1),
+		quartz.WithQueue(nil, &sync.Mutex{}),
+		quartz.WithQueue(quartz.NewJobQueue(), nil),
+		quartz.WithLogger(nil),
+	}
+	for _, opt := range opts {
+		sched, err := quartz.NewStdScheduler(opt)
+		assert.IsNil(t, sched)
+		assert.ErrorIs(t, err, quartz.ErrIllegalArgument)
+	}
 }
 
 func jobCount(sched quartz.Scheduler, matchers ...quartz.Matcher[quartz.ScheduledJob]) int {
