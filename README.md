@@ -119,19 +119,6 @@ The scheduler can use its own implementation of `quartz.JobQueue` to allow state
 An example implementation of the job queue using the file system as a persistence layer
 can be found [here](./examples/queue/file_system.go).
 
-## Logger
-
-To set a custom logger, use the `logger.SetDefault` function.  
-The argument must implement the `logger.Logger` interface.
-
-The following example shows how to disable library logs.
-
-```go
-import "github.com/reugn/go-quartz/logger"
-
-logger.SetDefault(logger.NewSimpleLogger(nil, logger.LevelOff))
-```
-
 ## Examples
 
 ```go

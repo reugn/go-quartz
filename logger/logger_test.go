@@ -59,7 +59,7 @@ func TestLogger_SimpleOff(t *testing.T) {
 	assertEmpty(t, &b)
 }
 
-func TestLogger_NoOp(t *testing.T) {
+func TestLogger_NoOp(_ *testing.T) {
 	logger := l.NoOpLogger{}
 
 	logger.Trace("Trace")
