@@ -100,7 +100,7 @@ type cronField struct {
 	//
 	// Examples:
 	//
-	//	- For "5#3" (third Thursday of the month), n will be 3.
+	//  - For "5#3" (third Thursday of the month), n will be 3.
 	//  - For "2L" (last Sunday of the month), n will be -1.
 	n int
 }
