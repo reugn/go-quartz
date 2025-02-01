@@ -105,8 +105,12 @@ func TestScheduler(t *testing.T) {
 }
 
 func TestScheduler_BlockingSemantics(t *testing.T) {
+	t.Parallel()
+
 	for _, tt := range []string{"Blocking", "NonBlocking", "WorkerSmall", "WorkerLarge"} {
+		tt := tt
 		t.Run(tt, func(t *testing.T) {
+			t.Parallel()
 			var (
 				workerLimit int
 				opt         quartz.SchedulerOpt

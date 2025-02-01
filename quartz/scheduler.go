@@ -68,7 +68,7 @@ type Scheduler interface {
 
 // StdScheduler implements the [Scheduler] interface.
 type StdScheduler struct {
-	mtx sync.Mutex
+	mtx sync.RWMutex
 	wg  sync.WaitGroup
 
 	interrupt chan struct{}
@@ -300,7 +300,7 @@ func (sched *StdScheduler) ScheduleJob(
 
 	if err = sched.queue.Push(toSchedule); err == nil {
 		sched.logger.Debug("Successfully added job", "key", jobDetail.jobKey.String())
-		if sched.started {
+		if sched.IsStarted() {
 			sched.Reset()
 		}
 	}
@@ -342,8 +342,8 @@ func (sched *StdScheduler) Wait(ctx context.Context) {
 
 // IsStarted determines whether the scheduler has been started.
 func (sched *StdScheduler) IsStarted() bool {
-	sched.mtx.Lock()
-	defer sched.mtx.Unlock()
+	sched.mtx.RLock()
+	defer sched.mtx.RUnlock()
 
 	return sched.started
 }
@@ -391,7 +391,7 @@ func (sched *StdScheduler) DeleteJob(jobKey *JobKey) error {
 	_, err := sched.queue.Remove(jobKey)
 	if err == nil {
 		sched.logger.Debug("Successfully deleted job", "key", jobKey.String())
-		if sched.started {
+		if sched.IsStarted() {
 			sched.Reset()
 		}
 	}
@@ -426,7 +426,7 @@ func (sched *StdScheduler) PauseJob(jobKey *JobKey) error {
 		}
 		if err = sched.queue.Push(paused); err == nil {
 			sched.logger.Debug("Successfully paused job", "key", jobKey.String())
-			if sched.started {
+			if sched.IsStarted() {
 				sched.Reset()
 			}
 		}
@@ -466,7 +466,7 @@ func (sched *StdScheduler) ResumeJob(jobKey *JobKey) error {
 		}
 		if err = sched.queue.Push(resumed); err == nil {
 			sched.logger.Debug("Successfully resumed job", "key", jobKey.String())
-			if sched.started {
+			if sched.IsStarted() {
 				sched.Reset()
 			}
 		}
@@ -483,7 +483,7 @@ func (sched *StdScheduler) Clear() error {
 	err := sched.queue.Clear()
 	if err == nil {
 		sched.logger.Debug("Successfully cleared job queue")
-		if sched.started {
+		if sched.IsStarted() {
 			sched.Reset()
 		}
 	}
