@@ -1,13 +1,13 @@
 package csm
 
-var _ csmNode = (*CommonNode)(nil)
-
 type CommonNode struct {
 	value  int
 	min    int
 	max    int
 	values []int
 }
+
+var _ csmNode = (*CommonNode)(nil)
 
 func NewCommonNode(value, min, max int, values []int) *CommonNode {
 	return &CommonNode{value, min, max, values}
@@ -54,7 +54,7 @@ func (n *CommonNode) next() bool {
 }
 
 func (n *CommonNode) nextInRange() bool {
-	// Find the next value in the range (assuming n.values is sorted)
+	// find the next value in the range (assuming n.values is sorted)
 	for _, value := range n.values {
 		if value > n.value {
 			n.value = value
@@ -62,7 +62,7 @@ func (n *CommonNode) nextInRange() bool {
 		}
 	}
 
-	// If the end of the values array is reached return set to the first valid value
+	// the end of the values array is reached; set to the first valid value
 	n.value = n.values[0]
 	return true
 }

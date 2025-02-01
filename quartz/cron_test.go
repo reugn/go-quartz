@@ -238,6 +238,47 @@ func TestCronExpressionSpecial(t *testing.T) {
 	}
 }
 
+func TestCronExpressionDayOfWeek(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		expression string
+		expected   string
+	}{
+		{
+			expression: "0 15 10 ? * L",
+			expected:   "Sat Oct 26 10:15:00 2024",
+		},
+		{
+			expression: "0 15 10 ? * 5L",
+			expected:   "Thu Oct 31 10:15:00 2024",
+		},
+		{
+			expression: "0 15 10 ? * 2#1",
+			expected:   "Mon Nov 4 10:15:00 2024",
+		},
+		{
+			expression: "0 15 10 ? * 3#5",
+			expected:   "Tue Mar 31 10:15:00 2026",
+		},
+		{
+			expression: "0 15 10 ? * 7#5",
+			expected:   "Sat May 30 10:15:00 2026",
+		},
+	}
+
+	prev := time.Date(2024, 1, 1, 12, 00, 00, 00, time.UTC).UnixNano()
+	for _, tt := range tests {
+		test := tt
+		t.Run(test.expression, func(t *testing.T) {
+			t.Parallel()
+			cronTrigger, err := quartz.NewCronTrigger(test.expression)
+			assert.IsNil(t, err)
+			result, _ := iterate(prev, cronTrigger, 10)
+			assert.Equal(t, result, test.expected)
+		})
+	}
+}
+
 func TestCronExpressionInvalidLength(t *testing.T) {
 	t.Parallel()
 	_, err := quartz.NewCronTrigger("0 0 0 * *")
@@ -285,7 +326,7 @@ func iterate(prev int64, cronTrigger *quartz.CronTrigger, iterations int) (strin
 	var err error
 	for i := 0; i < iterations; i++ {
 		prev, err = cronTrigger.NextFireTime(prev)
-		// fmt.Println(time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout))
+		// log.Print(time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout))
 		if err != nil {
 			fmt.Println(err)
 			return "", err
@@ -319,6 +360,16 @@ func TestCronExpressionParseError(t *testing.T) {
 		"*/X * * * * *",
 		"200/100 * * * * *",
 		"0 5,7 14 1 * Sun *", // day field set twice
+		"0 5,7 14 ? * 2#6 *",
+		"0 5,7 14 ? * 2#4,4L *",
+		"0 0 0 * * -1#1",
+		"0 0 0 ? * 1#-1",
+		"0 0 0 ? * #1",
+		"0 0 0 ? * 1#",
+		"0 0 0 * * a#2",
+		"0 0 0 * * 50#2",
+		"0 5,7 14 ? * 8L *",
+		"0 5,7 14 ? * -1L *",
 	}
 
 	for _, tt := range tests {

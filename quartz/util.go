@@ -11,6 +11,8 @@ const (
 	listRune  = ','
 	stepRune  = '/'
 	rangeRune = '-'
+	lastRune  = 'L'
+	hashRune  = '#'
 )
 
 // Sep is the serialization delimiter; the default is a double colon.

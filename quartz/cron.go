@@ -14,19 +14,21 @@ import (
 //
 // Examples:
 //
-// Expression               Meaning
-// "0 0 12 * * ?"           Fire at 12pm (noon) every day
-// "0 15 10 ? * *"          Fire at 10:15am every day
-// "0 15 10 * * ?"          Fire at 10:15am every day
-// "0 15 10 * * ? *"        Fire at 10:15am every day
-// "0 * 14 * * ?"           Fire every minute starting at 2pm and ending at 2:59pm, every day
-// "0 0/5 14 * * ?"         Fire every 5 minutes starting at 2pm and ending at 2:55pm, every day
-// "0 0/5 14,18 * * ?"      Fire every 5 minutes starting at 2pm and ending at 2:55pm,
-// AND fire every 5 minutes starting at 6pm and ending at 6:55pm, every day
-// "0 0-5 14 * * ?"         Fire every minute starting at 2pm and ending at 2:05pm, every day
-// "0 10,44 14 ? 3 WED"     Fire at 2:10pm and at 2:44pm every Wednesday in the month of March.
-// "0 15 10 ? * MON-FRI"    Fire at 10:15am every Monday, Tuesday, Wednesday, Thursday and Friday
-// "0 15 10 15 * ?"         Fire at 10:15am on the 15th day of every month
+//	Expression               Meaning
+//	"0 0 12 * * ?"           Fire at 12pm (noon) every day
+//	"0 15 10 ? * *"          Fire at 10:15am every day
+//	"0 15 10 * * ?"          Fire at 10:15am every day
+//	"0 15 10 * * ? *"        Fire at 10:15am every day
+//	"0 * 14 * * ?"           Fire every minute starting at 2pm and ending at 2:59pm, every day
+//	"0 0/5 14 * * ?"         Fire every 5 minutes starting at 2pm and ending at 2:55pm, every day
+//	"0 0/5 14,18 * * ?"      Fire every 5 minutes starting at 2pm and ending at 2:55pm,
+//	                         AND fire every 5 minutes starting at 6pm and ending at 6:55pm, every day
+//	"0 0-5 14 * * ?"         Fire every minute starting at 2pm and ending at 2:05pm, every day
+//	"0 10,44 14 ? 3 WED"     Fire at 2:10pm and at 2:44pm every Wednesday in the month of March.
+//	"0 15 10 ? * MON-FRI"    Fire at 10:15am every Monday, Tuesday, Wednesday, Thursday and Friday
+//	"0 15 10 15 * ?"         Fire at 10:15am on the 15th day of every month
+//	"0 15 10 ? * 6L"         Fire at 10:15am on the last Friday of every month
+//	"0 15 10 ? * 6#3"        Fire at 10:15am on the third Friday of every month
 type CronTrigger struct {
 	expression  string
 	fields      []*cronField
@@ -75,7 +77,7 @@ func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTri
 func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 	prevTime := time.Unix(prev/int64(time.Second), 0).In(ct.location)
 	// build a CronStateMachine and run once
-	csm := makeCSMFromFields(prevTime, ct.fields)
+	csm := newCSMFromFields(prevTime, ct.fields)
 	nextDateTime := csm.NextTriggerTime(prevTime.Location())
 	if nextDateTime.Before(prevTime) || nextDateTime.Equal(prevTime) {
 		return 0, ErrTriggerExpired
@@ -90,10 +92,30 @@ func (ct *CronTrigger) Description() string {
 
 // cronField represents a parsed cron expression field.
 type cronField struct {
+	// stores the parsed and sorted numeric values for the field
 	values []int
+	// n specifies the occurrence of the day of week within a
+	// month when '#' is used in the day-of-week field.
+	// When 'L' (last) is used, it will be set to -1.
+	//
+	// Examples:
+	//
+	//  - For "5#3" (third Thursday of the month), n will be 3.
+	//  - For "2L" (last Sunday of the month), n will be -1.
+	n int
 }
 
-// add increments each element of the underlying array by the given delta.
+// newCronField returns a new cronField.
+func newCronField(values []int) *cronField {
+	return &cronField{values: values}
+}
+
+// newCronFieldN returns a new cronField with the provided n.
+func newCronFieldN(values []int, n int) *cronField {
+	return &cronField{values: values, n: n}
+}
+
+// add increments each element of the underlying values array by the given delta.
 func (cf *cronField) add(delta int) {
 	for i := range cf.values {
 		cf.values[i] += delta
@@ -188,7 +210,7 @@ func buildCronField(tokens []string) ([]*cronField, error) {
 		return nil, err
 	}
 	// day-of-week field
-	fields[5], err = parseField(tokens[5], 1, 7, days)
+	fields[5], err = parseDayOfWeekField(tokens[5], 1, 7, days)
 	if err != nil {
 		return nil, err
 	}
@@ -209,13 +231,13 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 	}
 	// any value
 	if field == "*" || field == "?" {
-		return &cronField{[]int{}}, nil
+		return newCronField([]int{}), nil
 	}
 	// simple value
 	i, err := strconv.Atoi(field)
 	if err == nil {
 		if inScope(i, min, max) {
-			return &cronField{[]int{i}}, nil
+			return newCronField([]int{i}), nil
 		}
 		return nil, newInvalidCronFieldError("simple", field)
 	}
@@ -238,12 +260,49 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 			return nil, err
 		}
 		if inScope(intVal, min, max) {
-			return &cronField{[]int{intVal}}, nil
+			return newCronField([]int{intVal}), nil
 		}
 		return nil, newInvalidCronFieldError("literal", field)
 	}
 
 	return nil, newCronParseError(fmt.Sprintf("invalid field %s", field))
+}
+
+var (
+	cronLastCharacterRegex = regexp.MustCompile(`^[0-9]*L$`)
+	cronHashCharacterRegex = regexp.MustCompile(`^[0-9]+#[0-9]+$`)
+)
+
+func parseDayOfWeekField(field string, min, max int, translate ...[]string) (*cronField, error) {
+	if strings.ContainsRune(field, lastRune) && cronLastCharacterRegex.MatchString(field) {
+		day := strings.TrimSuffix(field, string(lastRune))
+		if day == "" { // Saturday
+			return newCronFieldN([]int{7}, -1), nil
+		}
+		dayOfWeek, err := strconv.Atoi(day)
+		if err != nil || !inScope(dayOfWeek, min, max) {
+			return nil, newInvalidCronFieldError("last", field)
+		}
+		return newCronFieldN([]int{dayOfWeek}, -1), nil
+	}
+
+	if strings.ContainsRune(field, hashRune) && cronHashCharacterRegex.MatchString(field) {
+		values := strings.Split(field, string(hashRune))
+		if len(values) != 2 {
+			return nil, newInvalidCronFieldError("hash", field)
+		}
+		dayOfWeek, err := strconv.Atoi(values[0])
+		if err != nil || !inScope(dayOfWeek, min, max) {
+			return nil, newInvalidCronFieldError("hash", field)
+		}
+		n, err := strconv.Atoi(values[1])
+		if err != nil || !inScope(n, 1, 5) {
+			return nil, newInvalidCronFieldError("hash", field)
+		}
+		return newCronFieldN([]int{dayOfWeek}, n), nil
+	}
+
+	return parseField(field, min, max, translate...)
 }
 
 func parseListField(field string, min, max int, glossary []string) (*cronField, error) {
@@ -270,7 +329,7 @@ func parseListField(field string, min, max int, glossary []string) (*cronField, 
 	}
 
 	sort.Ints(listValues)
-	return &cronField{listValues}, nil
+	return newCronField(listValues), nil
 }
 
 func parseRangeField(field string, min, max int, glossary []string) (*cronField, error) {
@@ -294,7 +353,7 @@ func parseRangeField(field string, min, max int, glossary []string) (*cronField,
 		return nil, err
 	}
 
-	return &cronField{rangeValues}, nil
+	return newCronField(rangeValues), nil
 }
 
 func parseStepField(field string, min, max int, glossary []string) (*cronField, error) {
@@ -341,5 +400,5 @@ func parseStepField(field string, min, max int, glossary []string) (*cronField, 
 		return nil, err
 	}
 
-	return &cronField{stepValues}, nil
+	return newCronField(stepValues), nil
 }
