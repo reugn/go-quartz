@@ -1,38 +1,22 @@
 package logger
 
-// A Logger handles log records.
+// Logger is an interface for handling structured log records at different
+// severity levels.
 type Logger interface {
-
-	// Trace logs at LevelTrace.
-	Trace(msg any)
-
-	// Tracef logs at LevelTrace.
-	Tracef(format string, args ...any)
-
-	// Debug logs at LevelDebug.
-	Debug(msg any)
-
-	// Debugf logs at LevelDebug.
-	Debugf(format string, args ...any)
-
-	// Info logs at LevelInfo.
-	Info(msg any)
-
-	// Infof logs at LevelInfo.
-	Infof(format string, args ...any)
-
-	// Warn logs at LevelWarn.
-	Warn(msg any)
-
-	// Warnf logs at LevelWarn.
-	Warnf(format string, args ...any)
-
-	// Error logs at LevelError.
-	Error(msg any)
-
-	// Errorf logs at LevelError.
-	Errorf(format string, args ...any)
-
-	// Enabled reports whether the logger handles records at the given level.
-	Enabled(level Level) bool
+	Trace(msg string, args ...any)
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
 }
+
+// NoOpLogger satisfies the Logger interface and discards all log messages.
+type NoOpLogger struct{}
+
+var _ Logger = (*NoOpLogger)(nil)
+
+func (NoOpLogger) Trace(_ string, _ ...any) {}
+func (NoOpLogger) Debug(_ string, _ ...any) {}
+func (NoOpLogger) Info(_ string, _ ...any)  {}
+func (NoOpLogger) Warn(_ string, _ ...any)  {}
+func (NoOpLogger) Error(_ string, _ ...any) {}

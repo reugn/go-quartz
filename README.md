@@ -9,7 +9,8 @@ A minimalistic and zero-dependency scheduling library for Go.
 
 ## About
 
-Inspired by the [Quartz](https://github.com/quartz-scheduler/quartz) Java scheduler.
+The implementation is inspired by the design of the [Quartz](https://github.com/quartz-scheduler/quartz)
+Java scheduler.
 
 ### Library building blocks
 
@@ -25,7 +26,7 @@ type Scheduler interface {
 	// IsStarted determines whether the scheduler has been started.
 	IsStarted() bool
 
-	// ScheduleJob schedules a job using a specified trigger.
+	// ScheduleJob schedules a job using the provided Trigger.
 	ScheduleJob(jobDetail *JobDetail, trigger Trigger) error
 
 	// GetJobKeys returns the keys of scheduled jobs.
@@ -118,19 +119,6 @@ The scheduler can use its own implementation of `quartz.JobQueue` to allow state
 An example implementation of the job queue using the file system as a persistence layer
 can be found [here](./examples/queue/file_system.go).
 
-## Logger
-
-To set a custom logger, use the `logger.SetDefault` function.  
-The argument must implement the `logger.Logger` interface.
-
-The following example shows how to disable library logs.
-
-```go
-import "github.com/reugn/go-quartz/logger"
-
-logger.SetDefault(logger.NewSimpleLogger(nil, logger.LevelOff))
-```
-
 ## Examples
 
 ```go
@@ -150,7 +138,7 @@ func main() {
 	defer cancel()
 
 	// create scheduler
-	sched := quartz.NewStdScheduler()
+	sched, _ := quartz.NewStdScheduler()
 
 	// async start scheduler
 	sched.Start(ctx)
@@ -165,11 +153,11 @@ func main() {
 	functionJob := job.NewFunctionJob(func(_ context.Context) (int, error) { return 42, nil })
 
 	// register jobs to scheduler
-	sched.ScheduleJob(quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
+	_ = sched.ScheduleJob(quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
 		cronTrigger)
-	sched.ScheduleJob(quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
+	_ = sched.ScheduleJob(quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
 		quartz.NewSimpleTrigger(time.Second*7))
-	sched.ScheduleJob(quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
+	_ = sched.ScheduleJob(quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
 		quartz.NewSimpleTrigger(time.Second*5))
 
 	// stop scheduler

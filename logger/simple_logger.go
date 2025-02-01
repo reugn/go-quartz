@@ -3,18 +3,33 @@ package logger
 import (
 	"fmt"
 	"log"
+	"strings"
+)
+
+// A Level is the importance or severity of a log event.
+// The higher the level, the more important or severe the event.
+type Level int
+
+// Log levels.
+const (
+	LevelTrace Level = -8
+	LevelDebug Level = -4
+	LevelInfo  Level = 0
+	LevelWarn  Level = 4
+	LevelError Level = 8
+	LevelOff   Level = 12
 )
 
 // SimpleLogger prefixes.
 const (
-	TracePrefix = "TRACE "
-	DebugPrefix = "DEBUG "
-	InfoPrefix  = "INFO "
-	WarnPrefix  = "WARN "
-	ErrorPrefix = "ERROR "
+	tracePrefix = "TRACE "
+	debugPrefix = "DEBUG "
+	infoPrefix  = "INFO "
+	warnPrefix  = "WARN "
+	errorPrefix = "ERROR "
 )
 
-// SimpleLogger implements the logger.Logger interface.
+// SimpleLogger implements the [Logger] interface.
 type SimpleLogger struct {
 	logger *log.Logger
 	level  Level
@@ -22,7 +37,7 @@ type SimpleLogger struct {
 
 var _ Logger = (*SimpleLogger)(nil)
 
-// NewSimpleLogger returns a new SimpleLogger.
+// NewSimpleLogger returns a new [SimpleLogger].
 func NewSimpleLogger(logger *log.Logger, level Level) *SimpleLogger {
 	return &SimpleLogger{
 		logger: logger,
@@ -30,97 +45,63 @@ func NewSimpleLogger(logger *log.Logger, level Level) *SimpleLogger {
 	}
 }
 
-// Trace logs at LevelTrace.
-// Arguments are handled in the manner of fmt.Println.
-func (l *SimpleLogger) Trace(msg any) {
-	if l.Enabled(LevelTrace) {
-		l.logger.SetPrefix(TracePrefix)
-		l.logger.Output(3, fmt.Sprint(msg))
+// Trace logs at the trace level.
+func (l *SimpleLogger) Trace(msg string, args ...any) {
+	if l.enabled(LevelTrace) {
+		l.logger.SetPrefix(tracePrefix)
+		_ = l.logger.Output(2, formatMessage(msg, args))
 	}
 }
 
-// Tracef logs at LevelTrace.
-// Arguments are handled in the manner of fmt.Printf.
-func (l *SimpleLogger) Tracef(format string, args ...any) {
-	if l.Enabled(LevelTrace) {
-		l.logger.SetPrefix(TracePrefix)
-		l.logger.Output(3, fmt.Sprintf(format, args...))
+// Debug logs at the debug level.
+func (l *SimpleLogger) Debug(msg string, args ...any) {
+	if l.enabled(LevelDebug) {
+		l.logger.SetPrefix(debugPrefix)
+		_ = l.logger.Output(2, formatMessage(msg, args))
 	}
 }
 
-// Debug logs at LevelDebug.
-// Arguments are handled in the manner of fmt.Println.
-func (l *SimpleLogger) Debug(msg any) {
-	if l.Enabled(LevelDebug) {
-		l.logger.SetPrefix(DebugPrefix)
-		l.logger.Output(3, fmt.Sprint(msg))
+// Info logs at the info level.
+func (l *SimpleLogger) Info(msg string, args ...any) {
+	if l.enabled(LevelInfo) {
+		l.logger.SetPrefix(infoPrefix)
+		_ = l.logger.Output(2, formatMessage(msg, args))
 	}
 }
 
-// Debugf logs at LevelDebug.
-// Arguments are handled in the manner of fmt.Printf.
-func (l *SimpleLogger) Debugf(format string, args ...any) {
-	if l.Enabled(LevelDebug) {
-		l.logger.SetPrefix(DebugPrefix)
-		l.logger.Output(3, fmt.Sprintf(format, args...))
+// Warn logs at the warn level.
+func (l *SimpleLogger) Warn(msg string, args ...any) {
+	if l.enabled(LevelWarn) {
+		l.logger.SetPrefix(warnPrefix)
+		_ = l.logger.Output(2, formatMessage(msg, args))
 	}
 }
 
-// Info logs at LevelInfo.
-// Arguments are handled in the manner of fmt.Println.
-func (l *SimpleLogger) Info(msg any) {
-	if l.Enabled(LevelInfo) {
-		l.logger.SetPrefix(InfoPrefix)
-		l.logger.Output(3, fmt.Sprint(msg))
+// Error logs at the error level.
+func (l *SimpleLogger) Error(msg string, args ...any) {
+	if l.enabled(LevelError) {
+		l.logger.SetPrefix(errorPrefix)
+		_ = l.logger.Output(2, formatMessage(msg, args))
 	}
 }
 
-// Infof logs at LevelInfo.
-// Arguments are handled in the manner of fmt.Printf.
-func (l *SimpleLogger) Infof(format string, args ...any) {
-	if l.Enabled(LevelInfo) {
-		l.logger.SetPrefix(InfoPrefix)
-		l.logger.Output(3, fmt.Sprintf(format, args...))
-	}
-}
-
-// Warn logs at LevelWarn.
-// Arguments are handled in the manner of fmt.Println.
-func (l *SimpleLogger) Warn(msg any) {
-	if l.Enabled(LevelWarn) {
-		l.logger.SetPrefix(WarnPrefix)
-		l.logger.Output(3, fmt.Sprint(msg))
-	}
-}
-
-// Warnf logs at LevelWarn.
-// Arguments are handled in the manner of fmt.Printf.
-func (l *SimpleLogger) Warnf(format string, args ...any) {
-	if l.Enabled(LevelWarn) {
-		l.logger.SetPrefix(WarnPrefix)
-		l.logger.Output(3, fmt.Sprintf(format, args...))
-	}
-}
-
-// Error logs at LevelError.
-// Arguments are handled in the manner of fmt.Println.
-func (l *SimpleLogger) Error(msg any) {
-	if l.Enabled(LevelError) {
-		l.logger.SetPrefix(ErrorPrefix)
-		l.logger.Output(3, fmt.Sprint(msg))
-	}
-}
-
-// Errorf logs at LevelError.
-// Arguments are handled in the manner of fmt.Printf.
-func (l *SimpleLogger) Errorf(format string, args ...any) {
-	if l.Enabled(LevelError) {
-		l.logger.SetPrefix(ErrorPrefix)
-		l.logger.Output(3, fmt.Sprintf(format, args...))
-	}
-}
-
-// Enabled reports whether the logger handles records at the given level.
-func (l *SimpleLogger) Enabled(level Level) bool {
+// enabled reports whether the SimpleLogger handles records at the given level.
+func (l *SimpleLogger) enabled(level Level) bool {
 	return level >= l.level
+}
+
+func formatMessage(msg string, args []any) string {
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "msg=%s", msg)
+
+	n := len(args)
+	for i := 0; i < n; i += 2 {
+		if i+1 < n {
+			_, _ = fmt.Fprintf(&b, ", %s=%v", args[i], args[i+1])
+		} else {
+			_, _ = fmt.Fprintf(&b, ", %v", args[i])
+		}
+	}
+
+	return b.String()
 }

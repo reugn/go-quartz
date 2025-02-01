@@ -263,6 +263,7 @@ func TestCurlJob_WithCallback(t *testing.T) {
 
 	resultChan := make(chan job.Status, 1)
 	opts := job.CurlJobOptions{
+		HTTPClient: mock.HTTPHandlerOk,
 		Callback: func(_ context.Context, job *job.CurlJob) {
 			resultChan <- job.JobStatus()
 		},

@@ -44,12 +44,12 @@ type JobQueue interface {
 	Push(job ScheduledJob) error
 
 	// Pop removes and returns the next to run scheduled job from the queue.
-	// Implementations should return an error wrapping [ErrQueueEmpty] if the
+	// Implementations should return an error wrapping ErrQueueEmpty if the
 	// queue is empty.
 	Pop() (ScheduledJob, error)
 
 	// Head returns the first scheduled job without removing it from the queue.
-	// Implementations should return an error wrapping [ErrQueueEmpty] if the
+	// Implementations should return an error wrapping ErrQueueEmpty if the
 	// queue is empty.
 	Head() (ScheduledJob, error)
 

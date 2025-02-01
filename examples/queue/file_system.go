@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"math"
 	"os"
 	"strconv"
@@ -17,76 +17,100 @@ import (
 	"github.com/reugn/go-quartz/quartz"
 )
 
-const dataFolder = "./store"
-const fileMode fs.FileMode = 0744
+const (
+	dataFolder             = "./store"
+	fileMode   fs.FileMode = 0744
+)
 
 func init() {
 	quartz.Sep = "_"
 }
 
+//nolint:funlen
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 31*time.Second)
 	defer cancel()
 
+	stdLogger := log.New(os.Stdout, "", log.LstdFlags|log.Lmsgprefix|log.Lshortfile)
+	l := logger.NewSimpleLogger(stdLogger, logger.LevelTrace)
+
 	if _, err := os.Stat(dataFolder); os.IsNotExist(err) {
 		if err := os.Mkdir(dataFolder, fileMode); err != nil {
-			logger.Warnf("Failed to create data folder: %s", err)
+			l.Warn("Failed to create data folder", "error", err)
 			return
 		}
 	}
 
-	logger.Info("Starting scheduler")
-	jobQueue := newJobQueue()
-	scheduler := quartz.NewStdSchedulerWithOptions(quartz.StdSchedulerOptions{
-		OutdatedThreshold: time.Second, // considering file system I/O latency
-	}, jobQueue, nil)
+	l.Info("Starting scheduler")
+	jobQueue := newJobQueue(l)
+	scheduler, err := quartz.NewStdScheduler(
+		quartz.WithOutdatedThreshold(time.Second), // considering file system I/O latency
+		quartz.WithQueue(jobQueue, &sync.Mutex{}),
+		quartz.WithLogger(l),
+	)
+	if err != nil {
+		l.Error("Failed to create scheduler", "error", err)
+		return
+	}
+
 	scheduler.Start(ctx)
 
 	jobQueueSize, err := jobQueue.Size()
 	if err != nil {
-		logger.Errorf("Failed to fetch job queue size: %s", err)
+		l.Error("Failed to fetch job queue size", "error", err)
 		return
 	}
 
 	if jobQueueSize == 0 {
-		logger.Info("Scheduling new jobs")
-		jobDetail1 := quartz.NewJobDetail(&printJob{5}, quartz.NewJobKey("job1"))
+		l.Info("Scheduling new jobs")
+		jobDetail1 := quartz.NewJobDetail(newPrintJob(5, l), quartz.NewJobKey("job1"))
 		if err := scheduler.ScheduleJob(jobDetail1, quartz.NewSimpleTrigger(5*time.Second)); err != nil {
-			logger.Warnf("Failed to schedule job: %s", jobDetail1.JobKey())
+			l.Warn("Failed to schedule job", "key", jobDetail1.JobKey().String(), "error", err)
 		}
-		jobDetail2 := quartz.NewJobDetail(&printJob{10}, quartz.NewJobKey("job2"))
+		jobDetail2 := quartz.NewJobDetail(newPrintJob(10, l), quartz.NewJobKey("job2"))
 		if err := scheduler.ScheduleJob(jobDetail2, quartz.NewSimpleTrigger(10*time.Second)); err != nil {
-			logger.Warnf("Failed to schedule job: %s", jobDetail2.JobKey())
+			l.Warn("Failed to schedule job", "key", jobDetail2.JobKey().String(), "error", err)
 		}
 	} else {
-		logger.Info("Job queue is not empty")
+		l.Info("Job queue is not empty")
 	}
 
 	<-ctx.Done()
 
 	scheduledJobs, err := jobQueue.ScheduledJobs(nil)
 	if err != nil {
-		logger.Errorf("Failed to fetch scheduled jobs: %s", err)
+		l.Error("Failed to fetch scheduled jobs", "error", err)
 		return
 	}
+
 	jobNames := make([]string, 0, len(scheduledJobs))
 	for _, job := range scheduledJobs {
 		jobNames = append(jobNames, job.JobDetail().JobKey().String())
 	}
-	logger.Infof("Jobs in queue: %s", jobNames)
+
+	l.Info("Jobs in queue", "names", jobNames)
 }
 
 // printJob
 type printJob struct {
 	seconds int
+	logger  logger.Logger
 }
 
 var _ quartz.Job = (*printJob)(nil)
 
+func newPrintJob(seconds int, logger logger.Logger) *printJob {
+	return &printJob{
+		seconds: seconds,
+		logger:  logger,
+	}
+}
+
 func (job *printJob) Execute(_ context.Context) error {
-	logger.Infof("PrintJob: %d\n", job.seconds)
+	job.logger.Info(fmt.Sprintf("PrintJob: %d", job.seconds))
 	return nil
 }
+
 func (job *printJob) Description() string {
 	return fmt.Sprintf("PrintJob%s%d", quartz.Sep, job.seconds)
 }
@@ -100,24 +124,19 @@ type scheduledPrintJob struct {
 
 // serializedJob
 type serializedJob struct {
-	Job         string                   `json:"job"`
-	JobKey      string                   `json:"job_key"`
-	Options     *quartz.JobDetailOptions `json:"job_options"`
-	Trigger     string                   `json:"trigger"`
-	NextRunTime int64                    `json:"next_run_time"`
+	Job     string                   `json:"job"`
+	JobKey  string                   `json:"job_key"`
+	Options *quartz.JobDetailOptions `json:"job_options"`
+
+	Trigger     string `json:"trigger"`
+	NextRunTime int64  `json:"next_run_time"`
 }
 
 var _ quartz.ScheduledJob = (*scheduledPrintJob)(nil)
 
-func (job *scheduledPrintJob) JobDetail() *quartz.JobDetail {
-	return job.jobDetail
-}
-func (job *scheduledPrintJob) Trigger() quartz.Trigger {
-	return job.trigger
-}
-func (job *scheduledPrintJob) NextRunTime() int64 {
-	return job.nextRunTime
-}
+func (job *scheduledPrintJob) JobDetail() *quartz.JobDetail { return job.jobDetail }
+func (job *scheduledPrintJob) Trigger() quartz.Trigger      { return job.trigger }
+func (job *scheduledPrintJob) NextRunTime() int64           { return job.nextRunTime }
 
 // marshal returns the JSON encoding of the job.
 func marshal(job quartz.ScheduledJob) ([]byte, error) {
@@ -127,27 +146,31 @@ func marshal(job quartz.ScheduledJob) ([]byte, error) {
 	serialized.Options = job.JobDetail().Options()
 	serialized.Trigger = job.Trigger().Description()
 	serialized.NextRunTime = job.NextRunTime()
+
 	return json.Marshal(serialized)
 }
 
 // unmarshal parses the JSON-encoded job.
-func unmarshal(encoded []byte) (quartz.ScheduledJob, error) {
+func unmarshal(encoded []byte, l logger.Logger) (quartz.ScheduledJob, error) {
 	var serialized serializedJob
 	if err := json.Unmarshal(encoded, &serialized); err != nil {
 		return nil, err
 	}
+
 	jobVals := strings.Split(serialized.Job, quartz.Sep)
 	i, err := strconv.Atoi(jobVals[1])
 	if err != nil {
 		return nil, err
 	}
-	job := &printJob{i} // assuming we know the job type
+
+	job := newPrintJob(i, l) // assuming we know the job type
 	jobKeyVals := strings.Split(serialized.JobKey, quartz.Sep)
 	jobKey := quartz.NewJobKeyWithGroup(jobKeyVals[1], jobKeyVals[0])
 	jobDetail := quartz.NewJobDetailWithOptions(job, jobKey, serialized.Options)
 	triggerOpts := strings.Split(serialized.Trigger, quartz.Sep)
 	interval, _ := time.ParseDuration(triggerOpts[1])
 	trigger := quartz.NewSimpleTrigger(interval) // assuming we know the trigger type
+
 	return &scheduledPrintJob{
 		jobDetail:   jobDetail,
 		trigger:     trigger,
@@ -158,14 +181,15 @@ func unmarshal(encoded []byte) (quartz.ScheduledJob, error) {
 // jobQueue implements the quartz.JobQueue interface, using the file system
 // as the persistence layer.
 type jobQueue struct {
-	mtx sync.Mutex
+	mtx    sync.Mutex
+	logger logger.Logger
 }
 
 var _ quartz.JobQueue = (*jobQueue)(nil)
 
 // newJobQueue initializes and returns an empty jobQueue.
-func newJobQueue() *jobQueue {
-	return &jobQueue{}
+func newJobQueue(logger logger.Logger) *jobQueue {
+	return &jobQueue{logger: logger}
 }
 
 // Push inserts a new scheduled job to the queue.
@@ -174,14 +198,15 @@ func newJobQueue() *jobQueue {
 func (jq *jobQueue) Push(job quartz.ScheduledJob) error {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	logger.Tracef("Push: %s", job.JobDetail().JobKey())
+
+	jq.logger.Trace("Push job", "key", job.JobDetail().JobKey().String())
 	serialized, err := marshal(job)
 	if err != nil {
 		return err
 	}
 	if err = os.WriteFile(fmt.Sprintf("%s/%d", dataFolder, job.NextRunTime()),
 		serialized, fileMode); err != nil {
-		logger.Errorf("Failed to write job: %s", err)
+		jq.logger.Error("Failed to write job", "error", err)
 		return err
 	}
 	return nil
@@ -191,16 +216,17 @@ func (jq *jobQueue) Push(job quartz.ScheduledJob) error {
 func (jq *jobQueue) Pop() (quartz.ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	logger.Trace("Pop")
-	job, err := findHead()
+
+	jq.logger.Trace("Pop")
+	job, err := jq.findHead()
 	if err == nil {
 		if err = os.Remove(fmt.Sprintf("%s/%d", dataFolder, job.NextRunTime())); err != nil {
-			logger.Errorf("Failed to delete job: %s", err)
+			jq.logger.Error("Failed to delete job", "error", err)
 			return nil, err
 		}
 		return job, nil
 	}
-	logger.Errorf("Failed to find job: %s", err)
+	jq.logger.Error("Failed to find job", "error", err)
 	return nil, err
 }
 
@@ -208,15 +234,16 @@ func (jq *jobQueue) Pop() (quartz.ScheduledJob, error) {
 func (jq *jobQueue) Head() (quartz.ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	logger.Trace("Head")
-	job, err := findHead()
+
+	jq.logger.Trace("Head")
+	job, err := jq.findHead()
 	if err != nil {
-		logger.Errorf("Failed to find job: %s", err)
+		jq.logger.Error("Failed to find job", "error", err)
 	}
 	return job, err
 }
 
-func findHead() (quartz.ScheduledJob, error) {
+func (jq *jobQueue) findHead() (quartz.ScheduledJob, error) {
 	fileInfo, err := os.ReadDir(dataFolder)
 	if err != nil {
 		return nil, err
@@ -224,20 +251,20 @@ func findHead() (quartz.ScheduledJob, error) {
 	var lastUpdate int64 = math.MaxInt64
 	for _, file := range fileInfo {
 		if !file.IsDir() {
-			time, err := strconv.ParseInt(file.Name(), 10, 64)
-			if err == nil && time < lastUpdate {
-				lastUpdate = time
+			nextTime, err := strconv.ParseInt(file.Name(), 10, 64)
+			if err == nil && nextTime < lastUpdate {
+				lastUpdate = nextTime
 			}
 		}
 	}
 	if lastUpdate == math.MaxInt64 {
-		return nil, errors.New("no jobs found")
+		return nil, quartz.ErrJobNotFound
 	}
 	data, err := os.ReadFile(fmt.Sprintf("%s/%d", dataFolder, lastUpdate))
 	if err != nil {
 		return nil, err
 	}
-	job, err := unmarshal(data)
+	job, err := unmarshal(data, jq.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +276,8 @@ func findHead() (quartz.ScheduledJob, error) {
 func (jq *jobQueue) Get(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	logger.Trace("Get")
+
+	jq.logger.Trace("Get")
 	fileInfo, err := os.ReadDir(dataFolder)
 	if err != nil {
 		return nil, err
@@ -258,7 +286,7 @@ func (jq *jobQueue) Get(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 		if !file.IsDir() {
 			data, err := os.ReadFile(fmt.Sprintf("%s/%s", dataFolder, file.Name()))
 			if err == nil {
-				job, err := unmarshal(data)
+				job, err := unmarshal(data, jq.logger)
 				if err == nil {
 					if jobKey.Equals(job.JobDetail().JobKey()) {
 						return job, nil
@@ -267,14 +295,15 @@ func (jq *jobQueue) Get(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 			}
 		}
 	}
-	return nil, errors.New("no jobs found")
+	return nil, quartz.ErrJobNotFound
 }
 
 // Remove removes and returns the scheduled job with the specified key.
 func (jq *jobQueue) Remove(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	logger.Trace("Remove")
+
+	jq.logger.Trace("Remove")
 	fileInfo, err := os.ReadDir(dataFolder)
 	if err != nil {
 		return nil, err
@@ -284,7 +313,7 @@ func (jq *jobQueue) Remove(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 			path := fmt.Sprintf("%s/%s", dataFolder, file.Name())
 			data, err := os.ReadFile(path)
 			if err == nil {
-				job, err := unmarshal(data)
+				job, err := unmarshal(data, jq.logger)
 				if err == nil {
 					if jobKey.Equals(job.JobDetail().JobKey()) {
 						if err = os.Remove(path); err == nil {
@@ -295,7 +324,7 @@ func (jq *jobQueue) Remove(jobKey *quartz.JobKey) (quartz.ScheduledJob, error) {
 			}
 		}
 	}
-	return nil, errors.New("no jobs found")
+	return nil, quartz.ErrJobNotFound
 }
 
 // ScheduledJobs returns the slice of all scheduled jobs in the queue.
@@ -304,7 +333,8 @@ func (jq *jobQueue) ScheduledJobs(
 ) ([]quartz.ScheduledJob, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	logger.Trace("ScheduledJobs")
+
+	jq.logger.Trace("ScheduledJobs")
 	var jobs []quartz.ScheduledJob
 	fileInfo, err := os.ReadDir(dataFolder)
 	if err != nil {
@@ -314,7 +344,7 @@ func (jq *jobQueue) ScheduledJobs(
 		if !file.IsDir() {
 			data, err := os.ReadFile(fmt.Sprintf("%s/%s", dataFolder, file.Name()))
 			if err == nil {
-				job, err := unmarshal(data)
+				job, err := unmarshal(data, jq.logger)
 				if err == nil && isMatch(job, matchers) {
 					jobs = append(jobs, job)
 				}
@@ -338,7 +368,8 @@ func isMatch(job quartz.ScheduledJob, matchers []quartz.Matcher[quartz.Scheduled
 func (jq *jobQueue) Size() (int, error) {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	logger.Trace("Size")
+
+	jq.logger.Trace("Size")
 	files, err := os.ReadDir(dataFolder)
 	if err != nil {
 		return 0, err
@@ -350,6 +381,7 @@ func (jq *jobQueue) Size() (int, error) {
 func (jq *jobQueue) Clear() error {
 	jq.mtx.Lock()
 	defer jq.mtx.Unlock()
-	logger.Trace("Clear")
+
+	jq.logger.Trace("Clear")
 	return os.RemoveAll(dataFolder)
 }

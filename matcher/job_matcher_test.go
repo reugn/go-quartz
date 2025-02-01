@@ -11,7 +11,8 @@ import (
 )
 
 func TestMatcher_JobAll(t *testing.T) {
-	sched := quartz.NewStdScheduler()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
 
 	dummy := job.NewFunctionJob(func(_ context.Context) (bool, error) {
 		return true, nil

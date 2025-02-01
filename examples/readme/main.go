@@ -14,7 +14,7 @@ func main() {
 	defer cancel()
 
 	// create scheduler
-	sched := quartz.NewStdScheduler()
+	sched, _ := quartz.NewStdScheduler()
 
 	// async start scheduler
 	sched.Start(ctx)
@@ -29,11 +29,11 @@ func main() {
 	functionJob := job.NewFunctionJob(func(_ context.Context) (int, error) { return 42, nil })
 
 	// register jobs to scheduler
-	sched.ScheduleJob(quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
+	_ = sched.ScheduleJob(quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
 		cronTrigger)
-	sched.ScheduleJob(quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
+	_ = sched.ScheduleJob(quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
 		quartz.NewSimpleTrigger(time.Second*7))
-	sched.ScheduleJob(quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
+	_ = sched.ScheduleJob(quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
 		quartz.NewSimpleTrigger(time.Second*5))
 
 	// stop scheduler
