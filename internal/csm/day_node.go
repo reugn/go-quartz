@@ -2,21 +2,33 @@ package csm
 
 import "time"
 
-var _ csmNode = (*DayNode)(nil)
-
 type DayNode struct {
 	c             CommonNode
 	weekdayValues []int
-	month         *csmNode
-	year          *csmNode
+	n             int
+	month         csmNode
+	year          csmNode
 }
 
-func NewMonthdayNode(value, min, max int, dayOfMonthValues []int, month, year csmNode) *DayNode {
-	return &DayNode{CommonNode{value, min, max, dayOfMonthValues}, make([]int, 0), &month, &year}
+var _ csmNode = (*DayNode)(nil)
+
+func NewMonthDayNode(value, min, max int, dayOfMonthValues []int, month, year csmNode) *DayNode {
+	return &DayNode{
+		c:             CommonNode{value, min, max, dayOfMonthValues},
+		weekdayValues: make([]int, 0),
+		month:         month,
+		year:          year,
+	}
 }
 
-func NewWeekdayNode(value, min, max int, dayOfWeekValues []int, month, year csmNode) *DayNode {
-	return &DayNode{CommonNode{value, min, max, make([]int, 0)}, dayOfWeekValues, &month, &year}
+func NewWeekDayNode(value, min, max, n int, dayOfWeekValues []int, month, year csmNode) *DayNode {
+	return &DayNode{
+		c:             CommonNode{value, min, max, make([]int, 0)},
+		weekdayValues: dayOfWeekValues,
+		n:             n,
+		month:         month,
+		year:          year,
+	}
 }
 
 func (n *DayNode) Value() int {
@@ -30,25 +42,30 @@ func (n *DayNode) Reset() {
 
 func (n *DayNode) Next() (overflowed bool) {
 	if n.isWeekday() {
-		return n.nextWeekday()
+		if n.n == 0 {
+			return n.nextWeekday()
+		}
+		return n.nextWeekdayN()
 	}
 	return n.nextDay()
 }
 
 func (n *DayNode) nextWeekday() (overflowed bool) {
+	// the weekday of the previous scheduled time
 	weekday := n.getWeekday()
 
-	amount := 7 + n.weekdayValues[0] - weekday
-	// Find the next value in the range (assuming weekdays is sorted)
+	// the offset in days from the previous to the next day
+	offset := 7 + n.weekdayValues[0] - weekday
+	// find the next value in the range (assuming weekdays is sorted)
 	for _, value := range n.weekdayValues {
 		if value > weekday {
-			amount = value - weekday
+			offset = value - weekday
 			break
 		}
 	}
 
-	// If the end of the values array is reached set to the first valid value
-	return n.addDays(amount)
+	// if the end of the values array is reached set to the first valid value
+	return n.addDays(offset)
 }
 
 func (n *DayNode) nextDay() (overflowed bool) {
@@ -86,21 +103,21 @@ func (n *DayNode) isWeekday() bool {
 }
 
 func (n *DayNode) getWeekday() int {
-	date := time.Date((*n.year).Value(), time.Month((*n.month).Value()), n.c.value, 0, 0, 0, 0, time.UTC)
+	date := time.Date(n.year.Value(), time.Month(n.month.Value()), n.c.value, 0, 0, 0, 0, time.UTC)
 	return int(date.Weekday())
 }
 
-func (n *DayNode) addDays(amount int) (overflowed bool) {
-	overflowed = n.Value()+amount > n.max()
-	today := time.Date((*n.year).Value(), time.Month((*n.month).Value()), n.c.value, 0, 0, 0, 0, time.UTC)
-	newDate := today.AddDate(0, 0, amount)
+func (n *DayNode) addDays(offset int) (overflowed bool) {
+	overflowed = n.Value()+offset > n.max()
+	today := time.Date(n.year.Value(), time.Month(n.month.Value()), n.c.value, 0, 0, 0, 0, time.UTC)
+	newDate := today.AddDate(0, 0, offset)
 	n.c.value = newDate.Day()
 	return
 }
 
 func (n *DayNode) max() int {
-	month := time.Month((*n.month).Value())
-	year := (*n.year).Value()
+	month := time.Month(n.month.Value())
+	year := n.year.Value()
 
 	if month == time.December {
 		month = 1
@@ -111,4 +128,61 @@ func (n *DayNode) max() int {
 
 	date := time.Date(year, month, 0, 0, 0, 0, 0, time.UTC)
 	return date.Day()
+}
+
+func (n *DayNode) nextWeekdayN() (overflowed bool) {
+	n.c.value = n.getDayInMonth(n.daysOfWeekInMonth())
+	return
+}
+
+func (n *DayNode) getDayInMonth(dates []int) int {
+	if n.n > len(dates) {
+		n.advanceMonth()
+		return n.getDayInMonth(n.daysOfWeekInMonth())
+	}
+
+	var dayInMonth int
+	if n.n > 0 {
+		dayInMonth = dates[n.n-1]
+	} else {
+		dayInMonth = dates[len(dates)-1]
+	}
+
+	if n.c.value >= dayInMonth {
+		n.c.value = 0
+		n.advanceMonth()
+		return n.getDayInMonth(n.daysOfWeekInMonth())
+	}
+
+	return dayInMonth
+}
+
+func (n *DayNode) advanceMonth() {
+	if n.month.Next() {
+		_ = n.year.Next()
+	}
+}
+
+func (n *DayNode) daysOfWeekInMonth() []int {
+	year := n.year.Value()
+	month := n.month.Value()
+
+	// the day of week specified for the node
+	weekday := n.weekdayValues[0]
+
+	var dates []int
+	// iterate through all the days of the month
+	for day := 1; ; day++ {
+		currentDate := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+		// stop if we have reached the next month
+		if currentDate.Month() != time.Month(month) {
+			break
+		}
+		// check if the current day is the required day of the week
+		if int(currentDate.Weekday()) == weekday {
+			dates = append(dates, day)
+		}
+	}
+
+	return dates
 }
