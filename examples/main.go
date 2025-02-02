@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -38,9 +38,20 @@ func main() {
 func sampleScheduler(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	stdLogger := log.New(os.Stdout, "", log.LstdFlags|log.Lmsgprefix|log.Lshortfile)
-	l := logger.NewSimpleLogger(stdLogger, logger.LevelInfo)
-	sched, err := quartz.NewStdScheduler(quartz.WithLogger(l))
+	slogLogger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.Level(logger.LevelTrace),
+		AddSource: true,
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.LevelKey {
+				level := a.Value.Any().(slog.Level)
+				if level == slog.Level(logger.LevelTrace) {
+					a.Value = slog.StringValue("TRACE")
+				}
+			}
+			return a
+		},
+	}))
+	sched, err := quartz.NewStdScheduler(quartz.WithLogger(logger.NewSlogLogger(ctx, slogLogger)))
 	if err != nil {
 		fmt.Println(err)
 		return

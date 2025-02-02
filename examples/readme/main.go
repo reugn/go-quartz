@@ -2,10 +2,13 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/reugn/go-quartz/job"
+	"github.com/reugn/go-quartz/logger"
 	"github.com/reugn/go-quartz/quartz"
 )
 
@@ -14,7 +17,8 @@ func main() {
 	defer cancel()
 
 	// create scheduler
-	sched, _ := quartz.NewStdScheduler()
+	slogLogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	sched, _ := quartz.NewStdScheduler(quartz.WithLogger(logger.NewSlogLogger(ctx, slogLogger)))
 
 	// async start scheduler
 	sched.Start(ctx)
@@ -32,9 +36,9 @@ func main() {
 	_ = sched.ScheduleJob(quartz.NewJobDetail(shellJob, quartz.NewJobKey("shellJob")),
 		cronTrigger)
 	_ = sched.ScheduleJob(quartz.NewJobDetail(curlJob, quartz.NewJobKey("curlJob")),
-		quartz.NewSimpleTrigger(time.Second*7))
+		quartz.NewSimpleTrigger(7*time.Second))
 	_ = sched.ScheduleJob(quartz.NewJobDetail(functionJob, quartz.NewJobKey("functionJob")),
-		quartz.NewSimpleTrigger(time.Second*5))
+		quartz.NewSimpleTrigger(5*time.Second))
 
 	// stop scheduler
 	sched.Stop()

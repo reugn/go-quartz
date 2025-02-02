@@ -2,61 +2,91 @@ package logger_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log"
+	"log/slog"
 	"testing"
 
 	l "github.com/reugn/go-quartz/logger"
 )
 
-func TestLogger_Simple(t *testing.T) {
-	var b bytes.Buffer
-	stdLogger := log.New(&b, "", log.LstdFlags)
-	logger := l.NewSimpleLogger(stdLogger, l.LevelInfo)
+func TestLogger(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		supplier func(*bytes.Buffer, l.Level) l.Logger
+	}{
+		{
+			name: "simple",
+			supplier: func(b *bytes.Buffer, level l.Level) l.Logger {
+				stdLogger := log.New(b, "", log.LstdFlags)
+				return l.NewSimpleLogger(stdLogger, level)
+			},
+		},
+		{
+			name: "slog",
+			supplier: func(b *bytes.Buffer, level l.Level) l.Logger {
+				slogLogger := slog.New(slog.NewTextHandler(b, &slog.HandlerOptions{
+					Level:     slog.Level(level),
+					AddSource: true,
+				}))
+				return l.NewSlogLogger(context.Background(), slogLogger)
+			},
+		},
+	}
 
-	logger.Trace("Trace")
-	assertEmpty(t, &b)
+	for _, tt := range tests {
+		test := tt
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var b bytes.Buffer
+			logger := test.supplier(&b, l.LevelInfo)
 
-	logger.Debug("Debug")
-	assertEmpty(t, &b)
+			logger.Trace("Trace")
+			assertEmpty(t, &b)
 
-	logger.Info("Info")
-	assertNotEmpty(t, &b)
+			logger.Debug("Debug")
+			assertEmpty(t, &b)
 
-	b.Reset()
-	assertEmpty(t, &b)
+			logger.Info("Info")
+			assertNotEmpty(t, &b)
 
-	logger.Warn("Warn", "error", "err1")
-	assertNotEmpty(t, &b)
+			b.Reset()
+			assertEmpty(t, &b)
 
-	b.Reset()
-	assertEmpty(t, &b)
+			logger.Warn("Warn", "error", "err1")
+			assertNotEmpty(t, &b)
 
-	logger.Error("Error", "error")
-	assertNotEmpty(t, &b)
+			b.Reset()
+			assertEmpty(t, &b)
 
-	b.Reset()
-	assertEmpty(t, &b)
+			logger.Error("Error", "error")
+			assertNotEmpty(t, &b)
 
-	logger = l.NewSimpleLogger(stdLogger, l.LevelTrace)
+			b.Reset()
+			assertEmpty(t, &b)
 
-	logger.Trace("Trace")
-	assertNotEmpty(t, &b)
+			logger = test.supplier(&b, l.LevelTrace)
 
-	b.Reset()
-	assertEmpty(t, &b)
+			logger.Trace("Trace")
+			assertNotEmpty(t, &b)
 
-	logger.Debug("Debug")
-	assertNotEmpty(t, &b)
-}
+			b.Reset()
+			assertEmpty(t, &b)
 
-func TestLogger_SimpleOff(t *testing.T) {
-	var b bytes.Buffer
-	stdLogger := log.New(&b, "", log.LstdFlags)
-	logger := l.NewSimpleLogger(stdLogger, l.LevelOff)
+			logger.Debug("Debug")
+			assertNotEmpty(t, &b)
 
-	logger.Error("Error")
-	assertEmpty(t, &b)
+			b.Reset()
+			assertEmpty(t, &b)
+
+			logger = test.supplier(&b, l.LevelOff)
+
+			logger.Error("Error")
+			assertEmpty(t, &b)
+		})
+	}
 }
 
 func TestLogger_NoOp(_ *testing.T) {
