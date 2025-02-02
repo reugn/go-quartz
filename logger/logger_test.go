@@ -32,7 +32,8 @@ func TestLogger(t *testing.T) {
 					Level:     slog.Level(level),
 					AddSource: true,
 				}))
-				return l.NewSlogLogger(nil, slogLogger)
+				var ctx context.Context // test nil context
+				return l.NewSlogLogger(ctx, slogLogger)
 			},
 		},
 	}
