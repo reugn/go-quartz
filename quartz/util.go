@@ -8,11 +8,12 @@ import (
 )
 
 const (
-	listRune  = ','
-	stepRune  = '/'
-	rangeRune = '-'
-	lastRune  = 'L'
-	hashRune  = '#'
+	listRune    = ','
+	stepRune    = '/'
+	rangeRune   = '-'
+	weekdayRune = 'W'
+	lastRune    = 'L'
+	hashRune    = '#'
 )
 
 // Sep is the serialization delimiter; the default is a double colon.
