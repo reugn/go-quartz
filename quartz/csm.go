@@ -6,6 +6,11 @@ import (
 	CSM "github.com/reugn/go-quartz/internal/csm"
 )
 
+const (
+	cronLastDayOfMonthN = CSM.NLastDayOfMonth
+	cronWeekdayN        = CSM.NWeekday
+)
+
 func newCSMFromFields(prev time.Time, fields []*cronField) *CSM.CronStateMachine {
 	year := CSM.NewCommonNode(prev.Year(), 0, 999999, fields[6].values)
 	month := CSM.NewCommonNode(int(prev.Month()), 1, 12, fields[4].values)
@@ -13,7 +18,7 @@ func newCSMFromFields(prev time.Time, fields []*cronField) *CSM.CronStateMachine
 	if len(fields[5].values) != 0 {
 		day = CSM.NewWeekDayNode(prev.Day(), 1, 31, fields[5].n, fields[5].values, month, year)
 	} else {
-		day = CSM.NewMonthDayNode(prev.Day(), 1, 31, fields[3].values, month, year)
+		day = CSM.NewMonthDayNode(prev.Day(), 1, 31, fields[3].n, fields[3].values, month, year)
 	}
 	hour := CSM.NewCommonNode(prev.Hour(), 0, 59, fields[2].values)
 	minute := CSM.NewCommonNode(prev.Minute(), 0, 59, fields[1].values)

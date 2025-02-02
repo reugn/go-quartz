@@ -70,7 +70,7 @@ func (n *CommonNode) nextInRange() bool {
 func (n *CommonNode) isValid() bool {
 	withinLimits := n.value >= n.min && n.value <= n.max
 	if n.hasRange() {
-		withinLimits = withinLimits && contained(n.value, n.values)
+		withinLimits = withinLimits && contains(n.values, n.value)
 	}
 	return withinLimits
 }

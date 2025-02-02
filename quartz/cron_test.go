@@ -238,6 +238,47 @@ func TestCronExpressionSpecial(t *testing.T) {
 	}
 }
 
+func TestCronExpressionDayOfMonth(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		expression string
+		expected   string
+	}{
+		{
+			expression: "0 15 10 L * ?",
+			expected:   "Mon Mar 31 10:15:00 2025",
+		},
+		{
+			expression: "0 15 10 L-5 * ?",
+			expected:   "Wed Mar 26 10:15:00 2025",
+		},
+		{
+			expression: "0 15 10 15W * ?",
+			expected:   "Fri Mar 14 10:15:00 2025",
+		},
+		{
+			expression: "0 15 10 1W 1/2 ?",
+			expected:   "Wed Jul 1 10:15:00 2026",
+		},
+		{
+			expression: "0 15 10 31W * ?",
+			expected:   "Mon Mar 31 10:15:00 2025",
+		},
+	}
+
+	prev := time.Date(2024, 1, 1, 12, 00, 00, 00, time.UTC).UnixNano()
+	for _, tt := range tests {
+		test := tt
+		t.Run(test.expression, func(t *testing.T) {
+			t.Parallel()
+			cronTrigger, err := quartz.NewCronTrigger(test.expression)
+			assert.IsNil(t, err)
+			result, _ := iterate(prev, cronTrigger, 15)
+			assert.Equal(t, result, test.expected)
+		})
+	}
+}
+
 func TestCronExpressionDayOfWeek(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -370,6 +411,14 @@ func TestCronExpressionParseError(t *testing.T) {
 		"0 0 0 * * 50#2",
 		"0 5,7 14 ? * 8L *",
 		"0 5,7 14 ? * -1L *",
+		"0 5,7 14 ? * 0L *",
+		"0 15 10 W * ?",
+		"0 15 10 0W * ?",
+		"0 15 10 32W * ?",
+		"0 15 10 W15 * ?",
+		"0 15 10 L- * ?",
+		"0 15 10 L-a * ?",
+		"0 15 10 L-32 * ?",
 	}
 
 	for _, tt := range tests {

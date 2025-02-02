@@ -29,6 +29,8 @@ import (
 //	"0 15 10 15 * ?"         Fire at 10:15am on the 15th day of every month
 //	"0 15 10 ? * 6L"         Fire at 10:15am on the last Friday of every month
 //	"0 15 10 ? * 6#3"        Fire at 10:15am on the third Friday of every month
+//	"0 15 10 L * ?"          Fire at 10:15am on the last day of every month
+//	"0 15 10 L-2 * ?"        Fire at 10:15am on the 2nd-to-last last day of every month
 type CronTrigger struct {
 	expression  string
 	fields      []*cronField
@@ -94,14 +96,8 @@ func (ct *CronTrigger) Description() string {
 type cronField struct {
 	// stores the parsed and sorted numeric values for the field
 	values []int
-	// n specifies the occurrence of the day of week within a
-	// month when '#' is used in the day-of-week field.
-	// When 'L' (last) is used, it will be set to -1.
-	//
-	// Examples:
-	//
-	//  - For "5#3" (third Thursday of the month), n will be 3.
-	//  - For "2L" (last Sunday of the month), n will be -1.
+	// n is used to store special values for the day-of-month
+	// and day-of-week fields
 	n int
 }
 
@@ -200,7 +196,7 @@ func buildCronField(tokens []string) ([]*cronField, error) {
 		return nil, err
 	}
 	// day-of-month field
-	fields[3], err = parseField(tokens[3], 1, 31)
+	fields[3], err = parseDayOfMonthField(tokens[3], 1, 31)
 	if err != nil {
 		return nil, err
 	}
@@ -269,12 +265,46 @@ func parseField(field string, min, max int, translate ...[]string) (*cronField, 
 }
 
 var (
-	cronLastCharacterRegex = regexp.MustCompile(`^[0-9]*L$`)
-	cronHashCharacterRegex = regexp.MustCompile(`^[0-9]+#[0-9]+$`)
+	cronLastMonthDayRegex = regexp.MustCompile(`^L(-[0-9]+)?$`)
+	cronWeekdayRegex      = regexp.MustCompile(`^[0-9]+W$`)
+
+	cronLastWeekdayRegex = regexp.MustCompile(`^[0-9]*L$`)
+	cronHashRegex        = regexp.MustCompile(`^[0-9]+#[0-9]+$`)
 )
 
+func parseDayOfMonthField(field string, min, max int, translate ...[]string) (*cronField, error) {
+	if strings.ContainsRune(field, lastRune) && cronLastMonthDayRegex.MatchString(field) {
+		if field == string(lastRune) {
+			return newCronFieldN([]int{}, cronLastDayOfMonthN), nil
+		}
+		values := strings.Split(field, string(rangeRune))
+		if len(values) != 2 {
+			return nil, newInvalidCronFieldError("last", field)
+		}
+		n, err := strconv.Atoi(values[1])
+		if err != nil || !inScope(n, 1, 30) {
+			return nil, newInvalidCronFieldError("last", field)
+		}
+		return newCronFieldN([]int{}, -n), nil
+	}
+
+	if strings.ContainsRune(field, weekdayRune) && cronWeekdayRegex.MatchString(field) {
+		day := strings.TrimSuffix(field, string(weekdayRune))
+		if day == "" {
+			return nil, newInvalidCronFieldError("weekday", field)
+		}
+		dayOfMonth, err := strconv.Atoi(day)
+		if err != nil || !inScope(dayOfMonth, min, max) {
+			return nil, newInvalidCronFieldError("weekday", field)
+		}
+		return newCronFieldN([]int{dayOfMonth}, cronWeekdayN), nil
+	}
+
+	return parseField(field, min, max, translate...)
+}
+
 func parseDayOfWeekField(field string, min, max int, translate ...[]string) (*cronField, error) {
-	if strings.ContainsRune(field, lastRune) && cronLastCharacterRegex.MatchString(field) {
+	if strings.ContainsRune(field, lastRune) && cronLastWeekdayRegex.MatchString(field) {
 		day := strings.TrimSuffix(field, string(lastRune))
 		if day == "" { // Saturday
 			return newCronFieldN([]int{7}, -1), nil
@@ -286,7 +316,7 @@ func parseDayOfWeekField(field string, min, max int, translate ...[]string) (*cr
 		return newCronFieldN([]int{dayOfWeek}, -1), nil
 	}
 
-	if strings.ContainsRune(field, hashRune) && cronHashCharacterRegex.MatchString(field) {
+	if strings.ContainsRune(field, hashRune) && cronHashRegex.MatchString(field) {
 		values := strings.Split(field, string(hashRune))
 		if len(values) != 2 {
 			return nil, newInvalidCronFieldError("hash", field)
