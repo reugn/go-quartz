@@ -57,3 +57,15 @@ func ErrorIs(t *testing.T, err error, target error) {
 		t.Fatalf("Error type mismatch: %v != %v", err, target)
 	}
 }
+
+// Panics checks whether the given function panics.
+func Panics(t *testing.T, f func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Helper()
+			t.Fatalf("Function did not panic")
+		}
+	}()
+	f()
+}
