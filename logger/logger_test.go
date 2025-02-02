@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/reugn/go-quartz/internal/assert"
 	l "github.com/reugn/go-quartz/logger"
 )
 
@@ -31,7 +32,7 @@ func TestLogger(t *testing.T) {
 					Level:     slog.Level(level),
 					AddSource: true,
 				}))
-				return l.NewSlogLogger(context.Background(), slogLogger)
+				return l.NewSlogLogger(nil, slogLogger)
 			},
 		},
 	}
@@ -87,6 +88,12 @@ func TestLogger(t *testing.T) {
 			assertEmpty(t, &b)
 		})
 	}
+}
+
+func TestLogger_SlogPanic(t *testing.T) {
+	assert.Panics(t, func() {
+		l.NewSlogLogger(context.Background(), nil)
+	})
 }
 
 func TestLogger_NoOp(_ *testing.T) {
