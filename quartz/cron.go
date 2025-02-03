@@ -288,16 +288,22 @@ func parseDayOfMonthField(field string, min, max int, translate ...[]string) (*c
 		return newCronFieldN([]int{}, -n), nil
 	}
 
-	if strings.ContainsRune(field, weekdayRune) && cronWeekdayRegex.MatchString(field) {
-		day := strings.TrimSuffix(field, string(weekdayRune))
-		if day == "" {
-			return nil, newInvalidCronFieldError("weekday", field)
+	if strings.ContainsRune(field, weekdayRune) {
+		if field == fmt.Sprintf("%c%c", lastRune, weekdayRune) {
+			return newCronFieldN([]int{0}, cronLastDayOfMonthN|cronWeekdayN), nil
 		}
-		dayOfMonth, err := strconv.Atoi(day)
-		if err != nil || !inScope(dayOfMonth, min, max) {
-			return nil, newInvalidCronFieldError("weekday", field)
+
+		if cronWeekdayRegex.MatchString(field) {
+			day := strings.TrimSuffix(field, string(weekdayRune))
+			if day == "" {
+				return nil, newInvalidCronFieldError("weekday", field)
+			}
+			dayOfMonth, err := strconv.Atoi(day)
+			if err != nil || !inScope(dayOfMonth, min, max) {
+				return nil, newInvalidCronFieldError("weekday", field)
+			}
+			return newCronFieldN([]int{dayOfMonth}, cronWeekdayN), nil
 		}
-		return newCronFieldN([]int{dayOfMonth}, cronWeekdayN), nil
 	}
 
 	return parseField(field, min, max, translate...)

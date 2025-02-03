@@ -264,6 +264,10 @@ func TestCronExpressionDayOfMonth(t *testing.T) {
 			expression: "0 15 10 31W * ?",
 			expected:   "Mon Mar 31 10:15:00 2025",
 		},
+		{
+			expression: "0 15 10 LW * ?",
+			expected:   "Mon Mar 31 10:15:00 2025",
+		},
 	}
 
 	prev := time.Date(2024, 1, 1, 12, 00, 00, 00, time.UTC).UnixNano()
@@ -419,6 +423,7 @@ func TestCronExpressionParseError(t *testing.T) {
 		"0 15 10 L- * ?",
 		"0 15 10 L-a * ?",
 		"0 15 10 L-32 * ?",
+		"0 15 10 WL * ?",
 	}
 
 	for _, tt := range tests {
