@@ -140,8 +140,8 @@ func (n *DayNode) max() int {
 }
 
 func (n *DayNode) nextDayN() (overflowed bool) {
-	switch n.n {
-	case NWeekday:
+	switch {
+	case n.n > 0 && n.n&NWeekday != 0:
 		n.nextWeekdayOfMonth()
 	default:
 		n.nextLastDayOfMonth()
@@ -155,7 +155,7 @@ func (n *DayNode) nextWeekdayOfMonth() {
 
 	monthLastDate := lastDayOfMonth(year, month)
 	date := n.c.values[0]
-	if date > monthLastDate {
+	if date > monthLastDate || n.n&NLastDayOfMonth != 0 {
 		date = monthLastDate
 	}
 
