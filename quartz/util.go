@@ -69,28 +69,28 @@ func fillRangeValues(from, to int) ([]int, error) {
 	return rangeValues, nil
 }
 
-func fillStepValues(from, step, max int) ([]int, error) {
-	if max < from || step == 0 {
+func fillStepValues(from, step, upperBound int) ([]int, error) {
+	if upperBound < from || step == 0 {
 		return nil, newCronParseError("fill step values")
 	}
-	length := ((max - from) / step) + 1
+	length := ((upperBound - from) / step) + 1
 	stepValues := make([]int, length)
-	for i, j := from, 0; i <= max; i, j = i+step, j+1 {
+	for i, j := from, 0; i <= upperBound; i, j = i+step, j+1 {
 		stepValues[j] = i
 	}
 	return stepValues, nil
 }
 
 func normalize(field string, glossary []string) (int, error) {
-	intVal, err := strconv.Atoi(field)
+	numeric, err := strconv.Atoi(field)
 	if err != nil {
 		return translateLiteral(glossary, field)
 	}
-	return intVal, nil
+	return numeric, nil
 }
 
-func inScope(value, min, max int) bool {
-	if value >= min && value <= max {
+func inScope(value, lowerBound, upperBound int) bool {
+	if value >= lowerBound && value <= upperBound {
 		return true
 	}
 	return false

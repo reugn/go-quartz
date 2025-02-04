@@ -9,8 +9,8 @@ type CommonNode struct {
 
 var _ csmNode = (*CommonNode)(nil)
 
-func NewCommonNode(value, min, max int, values []int) *CommonNode {
-	return &CommonNode{value, min, max, values}
+func NewCommonNode(value, lowerBound, upperBound int, values []int) *CommonNode {
+	return &CommonNode{value, lowerBound, upperBound, values}
 }
 
 func (n *CommonNode) Value() int {

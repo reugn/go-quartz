@@ -111,7 +111,7 @@ func newCronFieldN(values []int, n int) *cronField {
 	return &cronField{values: values, n: n}
 }
 
-// add increments each element of the underlying values array by the given delta.
+// add increments each element of the underlying values slice by the given delta.
 func (cf *cronField) add(delta int) {
 	for i := range cf.values {
 		cf.values[i] += delta
@@ -121,6 +121,12 @@ func (cf *cronField) add(delta int) {
 // String is the cronField fmt.Stringer implementation.
 func (cf *cronField) String() string {
 	return strings.Trim(strings.Join(strings.Fields(fmt.Sprint(cf.values)), ","), "[]")
+}
+
+// boundary represents inclusive range boundaries for cron field values.
+type boundary struct {
+	lower int
+	upper int
 }
 
 var (
@@ -181,38 +187,38 @@ func buildCronField(tokens []string) ([]*cronField, error) {
 	var err error
 	fields := make([]*cronField, 7)
 	// second field
-	fields[0], err = parseField(tokens[0], 0, 59)
+	fields[0], err = parseField(tokens[0], boundary{0, 59}, nil)
 	if err != nil {
 		return nil, err
 	}
 	// minute field
-	fields[1], err = parseField(tokens[1], 0, 59)
+	fields[1], err = parseField(tokens[1], boundary{0, 59}, nil)
 	if err != nil {
 		return nil, err
 	}
 	// hour field
-	fields[2], err = parseField(tokens[2], 0, 23)
+	fields[2], err = parseField(tokens[2], boundary{0, 23}, nil)
 	if err != nil {
 		return nil, err
 	}
 	// day-of-month field
-	fields[3], err = parseDayOfMonthField(tokens[3], 1, 31)
+	fields[3], err = parseDayOfMonthField(tokens[3], boundary{1, 31}, nil)
 	if err != nil {
 		return nil, err
 	}
 	// month field
-	fields[4], err = parseField(tokens[4], 1, 12, months)
+	fields[4], err = parseField(tokens[4], boundary{1, 12}, months)
 	if err != nil {
 		return nil, err
 	}
 	// day-of-week field
-	fields[5], err = parseDayOfWeekField(tokens[5], 1, 7, days)
+	fields[5], err = parseDayOfWeekField(tokens[5], boundary{1, 7}, days)
 	if err != nil {
 		return nil, err
 	}
 	fields[5].add(-1)
 	// year field
-	fields[6], err = parseField(tokens[6], 1970, 1970*2)
+	fields[6], err = parseField(tokens[6], boundary{1970, 1970 * 2}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -220,59 +226,44 @@ func buildCronField(tokens []string) ([]*cronField, error) {
 	return fields, nil
 }
 
-func parseField(field string, min, max int, translate ...[]string) (*cronField, error) {
-	var glossary []string
-	if len(translate) > 0 {
-		glossary = translate[0]
-	}
+func parseField(field string, bound boundary, names []string) (*cronField, error) {
 	// any value
 	if field == "*" || field == "?" {
 		return newCronField([]int{}), nil
 	}
-	// simple value
-	i, err := strconv.Atoi(field)
-	if err == nil {
-		if inScope(i, min, max) {
-			return newCronField([]int{i}), nil
-		}
-		return nil, newInvalidCronFieldError("simple", field)
-	}
 	// list values
 	if strings.ContainsRune(field, listRune) {
-		return parseListField(field, min, max, glossary)
+		return parseListField(field, bound, names)
 	}
 	// step values
 	if strings.ContainsRune(field, stepRune) {
-		return parseStepField(field, min, max, glossary)
+		return parseStepField(field, bound, names)
 	}
 	// range values
 	if strings.ContainsRune(field, rangeRune) {
-		return parseRangeField(field, min, max, glossary)
+		return parseRangeField(field, bound, names)
 	}
-	// simple literal value
-	if glossary != nil {
-		intVal, err := translateLiteral(glossary, field)
-		if err != nil {
-			return nil, err
-		}
-		if inScope(intVal, min, max) {
-			return newCronField([]int{intVal}), nil
-		}
-		return nil, newInvalidCronFieldError("literal", field)
+	// simple value
+	numeric, err := normalize(field, names)
+	if err != nil {
+		return nil, err
+	}
+	if inScope(numeric, bound.lower, bound.upper) {
+		return newCronField([]int{numeric}), nil
 	}
 
-	return nil, newCronParseError(fmt.Sprintf("invalid field %s", field))
+	return nil, newInvalidCronFieldError("numeric", field)
 }
 
 var (
 	cronLastMonthDayRegex = regexp.MustCompile(`^L(-[0-9]+)?$`)
 	cronWeekdayRegex      = regexp.MustCompile(`^[0-9]+W$`)
 
-	cronLastWeekdayRegex = regexp.MustCompile(`^[0-9]*L$`)
-	cronHashRegex        = regexp.MustCompile(`^[0-9]+#[0-9]+$`)
+	cronLastWeekdayRegex = regexp.MustCompile(`^[a-zA-Z0-9]*L$`)
+	cronHashRegex        = regexp.MustCompile(`^[a-zA-Z0-9]+#[0-9]+$`)
 )
 
-func parseDayOfMonthField(field string, min, max int, translate ...[]string) (*cronField, error) {
+func parseDayOfMonthField(field string, bound boundary, names []string) (*cronField, error) {
 	if strings.ContainsRune(field, lastRune) && cronLastMonthDayRegex.MatchString(field) {
 		if field == string(lastRune) {
 			return newCronFieldN([]int{}, cronLastDayOfMonthN), nil
@@ -282,7 +273,7 @@ func parseDayOfMonthField(field string, min, max int, translate ...[]string) (*c
 			return nil, newInvalidCronFieldError("last", field)
 		}
 		n, err := strconv.Atoi(values[1])
-		if err != nil || !inScope(n, 1, 30) {
+		if err != nil || !inScope(n, bound.lower, bound.upper) {
 			return nil, newInvalidCronFieldError("last", field)
 		}
 		return newCronFieldN([]int{}, -n), nil
@@ -299,24 +290,24 @@ func parseDayOfMonthField(field string, min, max int, translate ...[]string) (*c
 				return nil, newInvalidCronFieldError("weekday", field)
 			}
 			dayOfMonth, err := strconv.Atoi(day)
-			if err != nil || !inScope(dayOfMonth, min, max) {
+			if err != nil || !inScope(dayOfMonth, bound.lower, bound.upper) {
 				return nil, newInvalidCronFieldError("weekday", field)
 			}
 			return newCronFieldN([]int{dayOfMonth}, cronWeekdayN), nil
 		}
 	}
 
-	return parseField(field, min, max, translate...)
+	return parseField(field, bound, names)
 }
 
-func parseDayOfWeekField(field string, min, max int, translate ...[]string) (*cronField, error) {
+func parseDayOfWeekField(field string, bound boundary, names []string) (*cronField, error) {
 	if strings.ContainsRune(field, lastRune) && cronLastWeekdayRegex.MatchString(field) {
 		day := strings.TrimSuffix(field, string(lastRune))
 		if day == "" { // Saturday
 			return newCronFieldN([]int{7}, -1), nil
 		}
-		dayOfWeek, err := strconv.Atoi(day)
-		if err != nil || !inScope(dayOfWeek, min, max) {
+		dayOfWeek, err := normalize(day, names)
+		if err != nil || !inScope(dayOfWeek, bound.lower, bound.upper) {
 			return nil, newInvalidCronFieldError("last", field)
 		}
 		return newCronFieldN([]int{dayOfWeek}, -1), nil
@@ -327,8 +318,8 @@ func parseDayOfWeekField(field string, min, max int, translate ...[]string) (*cr
 		if len(values) != 2 {
 			return nil, newInvalidCronFieldError("hash", field)
 		}
-		dayOfWeek, err := strconv.Atoi(values[0])
-		if err != nil || !inScope(dayOfWeek, min, max) {
+		dayOfWeek, err := normalize(values[0], names)
+		if err != nil || !inScope(dayOfWeek, bound.lower, bound.upper) {
 			return nil, newInvalidCronFieldError("hash", field)
 		}
 		n, err := strconv.Atoi(values[1])
@@ -338,26 +329,26 @@ func parseDayOfWeekField(field string, min, max int, translate ...[]string) (*cr
 		return newCronFieldN([]int{dayOfWeek}, n), nil
 	}
 
-	return parseField(field, min, max, translate...)
+	return parseField(field, bound, names)
 }
 
-func parseListField(field string, min, max int, glossary []string) (*cronField, error) {
+func parseListField(field string, bound boundary, names []string) (*cronField, error) {
 	t := strings.Split(field, string(listRune))
 	values, stepValues := extractStepValues(t)
 	values, rangeValues := extractRangeValues(values)
-	listValues, err := translateLiterals(glossary, values)
+	listValues, err := translateLiterals(names, values)
 	if err != nil {
 		return nil, err
 	}
 	for _, v := range stepValues {
-		stepField, err := parseStepField(v, min, max, glossary)
+		stepField, err := parseStepField(v, bound, names)
 		if err != nil {
 			return nil, err
 		}
 		listValues = append(listValues, stepField.values...)
 	}
 	for _, v := range rangeValues {
-		rangeField, err := parseRangeField(v, min, max, glossary)
+		rangeField, err := parseRangeField(v, bound, names)
 		if err != nil {
 			return nil, err
 		}
@@ -368,20 +359,20 @@ func parseListField(field string, min, max int, glossary []string) (*cronField, 
 	return newCronField(listValues), nil
 }
 
-func parseRangeField(field string, min, max int, glossary []string) (*cronField, error) {
+func parseRangeField(field string, bound boundary, names []string) (*cronField, error) {
 	t := strings.Split(field, string(rangeRune))
 	if len(t) != 2 {
 		return nil, newInvalidCronFieldError("range", field)
 	}
-	from, err := normalize(t[0], glossary)
+	from, err := normalize(t[0], names)
 	if err != nil {
 		return nil, err
 	}
-	to, err := normalize(t[1], glossary)
+	to, err := normalize(t[1], names)
 	if err != nil {
 		return nil, err
 	}
-	if !inScope(from, min, max) || !inScope(to, min, max) {
+	if !inScope(from, bound.lower, bound.upper) || !inScope(to, bound.lower, bound.upper) {
 		return nil, newInvalidCronFieldError("range", field)
 	}
 	rangeValues, err := fillRangeValues(from, to)
@@ -392,45 +383,48 @@ func parseRangeField(field string, min, max int, glossary []string) (*cronField,
 	return newCronField(rangeValues), nil
 }
 
-func parseStepField(field string, min, max int, glossary []string) (*cronField, error) {
+func parseStepField(field string, bound boundary, names []string) (*cronField, error) {
 	t := strings.Split(field, string(stepRune))
 	if len(t) != 2 {
 		return nil, newInvalidCronFieldError("step", field)
 	}
-	to := max
+	to := bound.upper
 	var (
 		from int
 		err  error
 	)
 	switch {
 	case t[0] == "*":
-		from = min
+		from = bound.lower
 	case strings.ContainsRune(t[0], rangeRune):
 		trange := strings.Split(t[0], string(rangeRune))
 		if len(trange) != 2 {
 			return nil, newInvalidCronFieldError("step", field)
 		}
-		from, err = normalize(trange[0], glossary)
+		from, err = normalize(trange[0], names)
 		if err != nil {
 			return nil, err
 		}
-		to, err = normalize(trange[1], glossary)
+		to, err = normalize(trange[1], names)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		from, err = normalize(t[0], glossary)
+		from, err = normalize(t[0], names)
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	step, err := strconv.Atoi(t[1])
 	if err != nil {
 		return nil, newInvalidCronFieldError("step", field)
 	}
-	if !inScope(from, min, max) || !inScope(step, 1, max) || !inScope(to, min, max) {
+	if !inScope(from, bound.lower, bound.upper) || !inScope(step, 1, bound.upper) ||
+		!inScope(to, bound.lower, bound.upper) {
 		return nil, newInvalidCronFieldError("step", field)
 	}
+
 	stepValues, err := fillStepValues(from, step, to)
 	if err != nil {
 		return nil, err

@@ -298,7 +298,15 @@ func TestCronExpressionDayOfWeek(t *testing.T) {
 			expected:   "Thu Oct 31 10:15:00 2024",
 		},
 		{
+			expression: "0 15 10 ? * THUL",
+			expected:   "Thu Oct 31 10:15:00 2024",
+		},
+		{
 			expression: "0 15 10 ? * 2#1",
+			expected:   "Mon Nov 4 10:15:00 2024",
+		},
+		{
+			expression: "0 15 10 ? * MON#1",
 			expected:   "Mon Nov 4 10:15:00 2024",
 		},
 		{
@@ -306,7 +314,15 @@ func TestCronExpressionDayOfWeek(t *testing.T) {
 			expected:   "Tue Mar 31 10:15:00 2026",
 		},
 		{
+			expression: "0 15 10 ? * Tue#5",
+			expected:   "Tue Mar 31 10:15:00 2026",
+		},
+		{
 			expression: "0 15 10 ? * 7#5",
+			expected:   "Sat May 30 10:15:00 2026",
+		},
+		{
+			expression: "0 15 10 ? * sat#5",
 			expected:   "Sat May 30 10:15:00 2026",
 		},
 	}
