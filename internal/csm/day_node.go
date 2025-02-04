@@ -17,9 +17,10 @@ type DayNode struct {
 
 var _ csmNode = (*DayNode)(nil)
 
-func NewMonthDayNode(value, min, max, n int, dayOfMonthValues []int, month, year csmNode) *DayNode {
+func NewMonthDayNode(value, lowerBound, upperBound, n int, dayOfMonthValues []int,
+	month, year csmNode) *DayNode {
 	return &DayNode{
-		c:             CommonNode{value, min, max, dayOfMonthValues},
+		c:             CommonNode{value, lowerBound, upperBound, dayOfMonthValues},
 		weekdayValues: make([]int, 0),
 		n:             n,
 		month:         month,
@@ -27,9 +28,10 @@ func NewMonthDayNode(value, min, max, n int, dayOfMonthValues []int, month, year
 	}
 }
 
-func NewWeekDayNode(value, min, max, n int, dayOfWeekValues []int, month, year csmNode) *DayNode {
+func NewWeekDayNode(value, lowerBound, upperBound, n int, dayOfWeekValues []int,
+	month, year csmNode) *DayNode {
 	return &DayNode{
-		c:             CommonNode{value, min, max, make([]int, 0)},
+		c:             CommonNode{value, lowerBound, upperBound, make([]int, 0)},
 		weekdayValues: dayOfWeekValues,
 		n:             n,
 		month:         month,

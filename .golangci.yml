@@ -23,6 +23,7 @@ linters:
     - misspell
     - nolintlint
     - prealloc
+    - reassign
     - revive
     - staticcheck
     - stylecheck
