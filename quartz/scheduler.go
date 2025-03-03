@@ -80,25 +80,25 @@ type StdScheduler struct {
 	queue       JobQueue
 	queueLocker sync.Locker
 
-	opts   schedulerConfig
+	opts   SchedulerConfig
 	logger logger.Logger
 }
 
 var _ Scheduler = (*StdScheduler)(nil)
 
-type schedulerConfig struct {
+type SchedulerConfig struct {
 	// When true, the scheduler will run jobs synchronously, waiting
 	// for each execution instance of the job to return before starting
 	// the next execution. Running with this option effectively serializes
 	// all job execution.
-	blockingExecution bool
+	BlockingExecution bool
 
 	// When greater than 0, all jobs will be dispatched to a pool of
 	// goroutines of WorkerLimit size to limit the total number of processes
 	// usable by the scheduler. If all worker threads are in use, job
 	// scheduling will wait till a job can be dispatched.
 	// If BlockingExecution is set, then WorkerLimit is ignored.
-	workerLimit int
+	WorkerLimit int
 
 	// When the scheduler attempts to execute a job, if the time elapsed
 	// since the job's scheduled execution time is less than or equal to the
@@ -109,7 +109,7 @@ type schedulerConfig struct {
 	// As a rule of thumb, your OutdatedThreshold should always be
 	// greater than 0, but less than the shortest interval used by
 	// your job or jobs.
-	outdatedThreshold time.Duration
+	OutdatedThreshold time.Duration
 
 	// This retry interval will be used if the scheduler fails to
 	// calculate the next time to interrupt for job execution. By default,
@@ -117,7 +117,7 @@ type schedulerConfig struct {
 	// milliseconds. Changing the default value may be beneficial when
 	// using a custom implementation of the JobQueue, where operations
 	// may timeout or fail.
-	retryInterval time.Duration
+	RetryInterval time.Duration
 
 	// MisfiredChan allows the creation of event listeners to handle jobs that
 	// have failed to be executed on time and have been skipped by the scheduler.
@@ -125,7 +125,7 @@ type schedulerConfig struct {
 	// Misfires can occur due to insufficient resources or scheduler downtime.
 	// Adjust OutdatedThreshold to establish an acceptable delay time and
 	// ensure regular job execution.
-	misfiredChan chan ScheduledJob
+	MisfiredChan chan ScheduledJob
 }
 
 // SchedulerOpt is a functional option type used to configure an [StdScheduler].
@@ -136,7 +136,7 @@ type SchedulerOpt func(*StdScheduler) error
 // main loop.
 func WithBlockingExecution() SchedulerOpt {
 	return func(c *StdScheduler) error {
-		c.opts.blockingExecution = true
+		c.opts.BlockingExecution = true
 		return nil
 	}
 }
@@ -149,7 +149,7 @@ func WithWorkerLimit(workerLimit int) SchedulerOpt {
 		if workerLimit < 0 {
 			return newIllegalArgumentError("workerLimit must be non-negative")
 		}
-		c.opts.workerLimit = workerLimit
+		c.opts.WorkerLimit = workerLimit
 		return nil
 	}
 }
@@ -158,7 +158,7 @@ func WithWorkerLimit(workerLimit int) SchedulerOpt {
 // considered outdated.
 func WithOutdatedThreshold(outdatedThreshold time.Duration) SchedulerOpt {
 	return func(c *StdScheduler) error {
-		c.opts.outdatedThreshold = outdatedThreshold
+		c.opts.OutdatedThreshold = outdatedThreshold
 		return nil
 	}
 }
@@ -167,7 +167,7 @@ func WithOutdatedThreshold(outdatedThreshold time.Duration) SchedulerOpt {
 // retrying to determine the next execution time for a job.
 func WithRetryInterval(retryInterval time.Duration) SchedulerOpt {
 	return func(c *StdScheduler) error {
-		c.opts.retryInterval = retryInterval
+		c.opts.RetryInterval = retryInterval
 		return nil
 	}
 }
@@ -180,7 +180,7 @@ func WithMisfiredChan(misfiredChan chan ScheduledJob) SchedulerOpt {
 		if misfiredChan == nil {
 			return newIllegalArgumentError("misfiredChan is nil")
 		}
-		c.opts.misfiredChan = misfiredChan
+		c.opts.MisfiredChan = misfiredChan
 		return nil
 	}
 }
@@ -237,9 +237,9 @@ func WithLogger(logger logger.Logger) SchedulerOpt {
 //	)
 func NewStdScheduler(opts ...SchedulerOpt) (Scheduler, error) {
 	// default scheduler configuration
-	config := schedulerConfig{
-		outdatedThreshold: 100 * time.Millisecond,
-		retryInterval:     100 * time.Millisecond,
+	config := SchedulerConfig{
+		OutdatedThreshold: 100 * time.Millisecond,
+		RetryInterval:     100 * time.Millisecond,
 	}
 
 	// initialize the scheduler with default values
@@ -514,7 +514,7 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 		switch {
 		case err != nil:
 			sched.logger.Error("Failed to fetch queue size", "error", err)
-			timer.Reset(sched.opts.retryInterval)
+			timer.Reset(sched.opts.RetryInterval)
 		case queueSize == 0:
 			sched.logger.Trace("Queue is empty")
 			timer.Reset(maxTimerDuration)
@@ -539,9 +539,9 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 }
 
 func (sched *StdScheduler) startWorkers(ctx context.Context) {
-	if !sched.opts.blockingExecution && sched.opts.workerLimit > 0 {
-		sched.logger.Debug("Starting scheduler workers", "n", sched.opts.workerLimit)
-		for i := 0; i < sched.opts.workerLimit; i++ {
+	if !sched.opts.BlockingExecution && sched.opts.WorkerLimit > 0 {
+		sched.logger.Debug("Starting scheduler workers", "n", sched.opts.WorkerLimit)
+		for i := 0; i < sched.opts.WorkerLimit; i++ {
 			sched.wg.Add(1)
 			go func() {
 				defer sched.wg.Done()
@@ -567,7 +567,7 @@ func (sched *StdScheduler) calculateNextTick() time.Duration {
 			return nextTickDuration
 		}
 		sched.logger.Error("Failed to calculate next tick", "error", err)
-		return sched.opts.retryInterval
+		return sched.opts.RetryInterval
 	}
 
 	nextRunTime := scheduledJob.NextRunTime()
@@ -590,9 +590,9 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 		sched.logger.Debug("Job is about to be executed",
 			"key", scheduled.JobDetail().jobKey.String())
 		switch {
-		case sched.opts.blockingExecution:
+		case sched.opts.BlockingExecution:
 			sched.executeWithRetries(ctx, scheduled.JobDetail())
-		case sched.opts.workerLimit > 0:
+		case sched.opts.WorkerLimit > 0:
 			select {
 			case sched.dispatch <- scheduled:
 			case <-ctx.Done():
@@ -647,12 +647,12 @@ func (sched *StdScheduler) validateJob(job ScheduledJob) (bool, func() (int64, e
 	}
 
 	now := NowNano()
-	if job.NextRunTime() < now-sched.opts.outdatedThreshold.Nanoseconds() {
+	if job.NextRunTime() < now-sched.opts.OutdatedThreshold.Nanoseconds() {
 		duration := time.Duration(now - job.NextRunTime())
 		sched.logger.Info("Job is outdated", "key", job.JobDetail().jobKey.String(),
 			"duration", duration)
 		select {
-		case sched.opts.misfiredChan <- job:
+		case sched.opts.MisfiredChan <- job:
 		default:
 		}
 		return false, func() (int64, error) { return job.Trigger().NextFireTime(now) }
