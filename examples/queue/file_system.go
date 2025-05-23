@@ -26,7 +26,6 @@ func init() {
 	quartz.Sep = "_"
 }
 
-//nolint:funlen
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 31*time.Second)
 	defer cancel()
