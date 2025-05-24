@@ -3,7 +3,7 @@ name: golangci-lint
 on:
   push:
     branches:
-      - master
+      - '**'
   pull_request:
 
 permissions:
@@ -27,6 +27,6 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: v1.63.4
+          version: v2.1.5
