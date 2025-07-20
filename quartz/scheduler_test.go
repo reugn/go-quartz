@@ -318,6 +318,34 @@ func TestScheduler_Cancel(t *testing.T) {
 	}
 }
 
+func TestScheduler_JobMetadata(t *testing.T) {
+	t.Parallel()
+
+	contextJob := job.NewFunctionJob(func(ctx context.Context) (int32, error) {
+		md, ok := ctx.Value(quartz.JobMetadataContextKey).(quartz.JobMetadata)
+		assert.Equal(t, ok, true)
+
+		if md.RunTime <= 0 {
+			t.Error("RunTime should be a valid timestamp")
+		}
+		fmt.Printf("Job metadata: %v\n", md)
+		return 0, nil
+	})
+
+	sched, err := quartz.NewStdScheduler(quartz.WithJobMetadata())
+	assert.IsNil(t, err)
+
+	jobDetail := quartz.NewJobDetail(contextJob, quartz.NewJobKey("contextJob"))
+	trigger := quartz.NewSimpleTrigger(2 * time.Millisecond)
+
+	err = sched.ScheduleJob(jobDetail, trigger)
+	assert.IsNil(t, err)
+
+	sched.Start(context.Background())
+	time.Sleep(5 * time.Millisecond)
+	sched.Stop()
+}
+
 func TestScheduler_JobWithRetries(t *testing.T) {
 	t.Parallel()
 
