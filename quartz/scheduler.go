@@ -66,6 +66,17 @@ type Scheduler interface {
 	Stop()
 }
 
+type dispatchedJob struct {
+	ctx       context.Context
+	jobDetail *JobDetail
+}
+
+type contextKey string
+
+// JobMetadataContextKey is a context key used to store and retrieve [JobMetadata]
+// from the [context.Context] passed to a job's Execute method.
+const JobMetadataContextKey = contextKey("JobMetadata")
+
 // StdScheduler implements the [Scheduler] interface.
 type StdScheduler struct {
 	mtx sync.RWMutex
@@ -74,7 +85,7 @@ type StdScheduler struct {
 	interrupt chan struct{}
 	cancel    context.CancelFunc
 	feeder    chan ScheduledJob
-	dispatch  chan ScheduledJob
+	dispatch  chan dispatchedJob
 	started   bool
 
 	queue       JobQueue
@@ -126,6 +137,20 @@ type SchedulerConfig struct {
 	// Adjust OutdatedThreshold to establish an acceptable delay time and
 	// ensure regular job execution.
 	MisfiredChan chan ScheduledJob
+
+	// JobMetadata, when set to true, enables the scheduler to enrich the context
+	// passed to a job's Execute method with JobMetadata. This provides custom
+	// Job implementations with access to additional contextual information
+	// about the job.
+	JobMetadata bool
+}
+
+// JobMetadata provides read-only details about a specific job execution's scheduling
+// context. It is added to the context by the scheduler.
+type JobMetadata struct {
+	// RunTime is the Unix timestamp at which the job was originally scheduled to
+	// begin execution.
+	RunTime int64
 }
 
 // SchedulerOpt is a functional option type used to configure an [StdScheduler].
@@ -137,6 +162,23 @@ type SchedulerOpt func(*StdScheduler) error
 func WithBlockingExecution() SchedulerOpt {
 	return func(c *StdScheduler) error {
 		c.opts.BlockingExecution = true
+		return nil
+	}
+}
+
+// WithJobMetadata configures the scheduler to attach a [JobMetadata] struct to the
+// [context.Context] passed to each job's Execute method.
+//
+// To retrieve this metadata within a custom [Job] implementation:
+//
+//	func (j *customJob) Execute(ctx context.Context) error {
+//		md, ok := ctx.Value(quartz.JobMetadataContextKey).(quartz.JobMetadata)
+//		// use md as needed
+//		return nil
+//	}
+func WithJobMetadata() SchedulerOpt {
+	return func(c *StdScheduler) error {
+		c.opts.JobMetadata = true
 		return nil
 	}
 }
@@ -246,7 +288,7 @@ func NewStdScheduler(opts ...SchedulerOpt) (Scheduler, error) {
 	scheduler := &StdScheduler{
 		interrupt:   make(chan struct{}, 1),
 		feeder:      make(chan ScheduledJob),
-		dispatch:    make(chan ScheduledJob),
+		dispatch:    make(chan dispatchedJob),
 		queue:       NewJobQueue(),
 		queueLocker: &sync.Mutex{},
 		opts:        config,
@@ -320,12 +362,12 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 	ctx, sched.cancel = context.WithCancel(ctx)
 	go func() { <-ctx.Done(); sched.Stop() }()
 
+	// start worker pool if configured
+	sched.startWorkers(ctx)
+
 	// start scheduler execution loop
 	sched.wg.Add(1)
 	go sched.startExecutionLoop(ctx)
-
-	// starts worker pool if configured
-	sched.startWorkers(ctx)
 
 	sched.started = true
 }
@@ -549,8 +591,8 @@ func (sched *StdScheduler) startWorkers(ctx context.Context) {
 					select {
 					case <-ctx.Done():
 						return
-					case scheduled := <-sched.dispatch:
-						sched.executeWithRetries(ctx, scheduled.JobDetail())
+					case dispatched := <-sched.dispatch:
+						sched.executeWithRetries(dispatched.ctx, dispatched.jobDetail)
 					}
 				}
 			}()
@@ -584,6 +626,14 @@ func (sched *StdScheduler) calculateNextTick() time.Duration {
 func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	// fetch a job for processing
 	scheduled, valid := sched.fetchAndReschedule()
+	// attach job metadata to the context
+	if sched.opts.JobMetadata {
+		ctx = context.WithValue(
+			ctx,
+			JobMetadataContextKey,
+			JobMetadata{RunTime: scheduled.NextRunTime()},
+		)
+	}
 
 	// execute the job
 	if valid {
@@ -594,7 +644,10 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 			sched.executeWithRetries(ctx, scheduled.JobDetail())
 		case sched.opts.WorkerLimit > 0:
 			select {
-			case sched.dispatch <- scheduled:
+			case sched.dispatch <- dispatchedJob{
+				ctx:       ctx,
+				jobDetail: scheduled.JobDetail(),
+			}:
 			case <-ctx.Done():
 				return
 			}
