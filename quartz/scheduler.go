@@ -264,6 +264,7 @@ func WithLogger(logger logger.Logger) SchedulerOpt {
 // The following options are available for configuring the scheduler:
 //
 //   - WithBlockingExecution()
+//   - WithJobMetadata()
 //   - WithWorkerLimit(workerLimit int)
 //   - WithOutdatedThreshold(outdatedThreshold time.Duration)
 //   - WithRetryInterval(retryInterval time.Duration)
@@ -626,6 +627,11 @@ func (sched *StdScheduler) calculateNextTick() time.Duration {
 func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 	// fetch a job for processing
 	scheduled, valid := sched.fetchAndReschedule()
+	// return if the job is not valid
+	if !valid {
+		return
+	}
+
 	// attach job metadata to the context
 	if sched.opts.JobMetadata {
 		ctx = context.WithValue(
@@ -635,29 +641,26 @@ func (sched *StdScheduler) executeAndReschedule(ctx context.Context) {
 		)
 	}
 
-	// execute the job
-	if valid {
-		sched.logger.Debug("Job is about to be executed",
-			"key", scheduled.JobDetail().jobKey.String())
-		switch {
-		case sched.opts.BlockingExecution:
-			sched.executeWithRetries(ctx, scheduled.JobDetail())
-		case sched.opts.WorkerLimit > 0:
-			select {
-			case sched.dispatch <- dispatchedJob{
-				ctx:       ctx,
-				jobDetail: scheduled.JobDetail(),
-			}:
-			case <-ctx.Done():
-				return
-			}
-		default:
-			sched.wg.Add(1)
-			go func() {
-				defer sched.wg.Done()
-				sched.executeWithRetries(ctx, scheduled.JobDetail())
-			}()
+	sched.logger.Debug("Job is about to be executed",
+		"key", scheduled.JobDetail().jobKey.String())
+	switch {
+	case sched.opts.BlockingExecution:
+		sched.executeWithRetries(ctx, scheduled.JobDetail())
+	case sched.opts.WorkerLimit > 0:
+		select {
+		case sched.dispatch <- dispatchedJob{
+			ctx:       ctx,
+			jobDetail: scheduled.JobDetail(),
+		}:
+		case <-ctx.Done():
+			return
 		}
+	default:
+		sched.wg.Add(1)
+		go func() {
+			defer sched.wg.Done()
+			sched.executeWithRetries(ctx, scheduled.JobDetail())
+		}()
 	}
 }
 
