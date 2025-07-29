@@ -68,7 +68,7 @@ func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTri
 		fields[0].values, _ = fillRangeValues(0, 59)
 	}
 
-	// tzPasses determines the number of iterations required when calculating the next
+	// tzPasses determines the number of maximum iterations when calculating the next
 	// fire time. Two iterations are used for time zones with Daylight Saving Time
 	// (DST) to resolve ambiguities caused by clock adjustments. UTC requires only
 	// one iteration as it's unaffected by DST.
@@ -92,8 +92,8 @@ func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 	// Initialize a CronStateMachine from the previous fire time and cron fields.
 	csm := newCSMFromFields(prevTime, ct.fields)
 
-	// Iterate ct.tzPasses times to determine the correct next scheduled fire time.
-	// This accounts for complexities like Daylight Saving Time (DST) transitions.
+	// Determine the correct next scheduled fire time. The ct.tzPasses iterations
+	// account for complexities like Daylight Saving Time (DST) transitions.
 	for i := 0; i < ct.tzPasses; i++ {
 		nextDateTime := csm.NextTriggerTime(ct.location)
 		if nextDateTime.After(prevTime) {
