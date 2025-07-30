@@ -34,8 +34,9 @@ import (
 type CronTrigger struct {
 	expression  string
 	fields      []*cronField
-	lastDefined int
 	location    *time.Location
+	lastDefined int
+	tzPasses    int
 }
 
 // Verify CronTrigger satisfies the Trigger interface.
@@ -67,24 +68,39 @@ func NewCronTriggerWithLoc(expression string, location *time.Location) (*CronTri
 		fields[0].values, _ = fillRangeValues(0, 59)
 	}
 
+	// tzPasses determines the number of maximum iterations when calculating the next
+	// fire time. Two iterations are used for time zones with Daylight Saving Time
+	// (DST) to resolve ambiguities caused by clock adjustments. UTC requires only
+	// one iteration as it's unaffected by DST.
+	tzPasses := 2
+	if location == time.UTC {
+		tzPasses = 1
+	}
+
 	return &CronTrigger{
 		expression:  expression,
 		fields:      fields,
-		lastDefined: lastDefined,
 		location:    location,
+		lastDefined: lastDefined,
+		tzPasses:    tzPasses,
 	}, nil
 }
 
 // NextFireTime returns the next time at which the CronTrigger is scheduled to fire.
 func (ct *CronTrigger) NextFireTime(prev int64) (int64, error) {
 	prevTime := time.Unix(prev/int64(time.Second), 0).In(ct.location)
-	// build a CronStateMachine and run once
+	// Initialize a CronStateMachine from the previous fire time and cron fields.
 	csm := newCSMFromFields(prevTime, ct.fields)
-	nextDateTime := csm.NextTriggerTime(prevTime.Location())
-	if nextDateTime.Before(prevTime) || nextDateTime.Equal(prevTime) {
-		return 0, ErrTriggerExpired
+
+	// Determine the correct next scheduled fire time. The ct.tzPasses iterations
+	// account for complexities like Daylight Saving Time (DST) transitions.
+	for i := 0; i < ct.tzPasses; i++ {
+		nextDateTime := csm.NextTriggerTime(ct.location)
+		if nextDateTime.After(prevTime) {
+			return nextDateTime.UnixNano(), nil
+		}
 	}
-	return nextDateTime.UnixNano(), nil
+	return 0, ErrTriggerExpired
 }
 
 // Description returns the description of the cron trigger.

@@ -93,7 +93,7 @@ func TestCronExpression(t *testing.T) {
 			t.Parallel()
 			cronTrigger, err := quartz.NewCronTrigger(test.expression)
 			assert.IsNil(t, err)
-			result, _ := iterate(prev, cronTrigger, 50)
+			result, _ := iterate(prev, cronTrigger, time.UTC, 50)
 			assert.Equal(t, result, test.expected)
 		})
 	}
@@ -110,30 +110,67 @@ func TestCronExpressionExpired(t *testing.T) {
 
 func TestCronExpressionWithLoc(t *testing.T) {
 	t.Parallel()
+	loc, err := time.LoadLocation("America/New_York")
+	assert.IsNil(t, err)
+
 	tests := []struct {
 		expression string
 		expected   string
+		prev       time.Time
+		iterations int
 	}{
 		{
 			expression: "0 5 22-23 * * Sun *",
-			expected:   "Mon Oct 16 03:05:00 2023",
+			expected:   "Sun Oct 15 23:05:00 2023",
+			prev:       time.Date(2023, 4, 29, 12, 00, 00, 00, loc),
+			iterations: 50,
 		},
 		{
 			expression: "0 0 10 * * Sun *",
-			expected:   "Sun Apr 7 14:00:00 2024",
+			expected:   "Sun Apr 7 10:00:00 2024",
+			prev:       time.Date(2023, 4, 29, 12, 00, 00, 00, loc),
+			iterations: 50,
+		},
+		// Daylight Saving Time (DST) transition tests (spring forward, fall back)
+		{
+			expression: "0 0 2 9 3 ?",
+			expected:   "Sun Mar 9 01:00:00 2025", // 2 AM doesn't exist, triggers at 1 AM instead
+			prev:       time.Date(2025, 1, 9, 1, 00, 00, 00, loc),
+			iterations: 1,
+		},
+		{
+			expression: "0 0 2 * * *",
+			expected:   "Mon Mar 10 02:00:00 2025",
+			prev:       time.Date(2025, 3, 9, 1, 00, 00, 00, loc),
+			iterations: 1,
+		},
+		{
+			expression: "0 0 * * * ?",
+			expected:   "Sun Mar 9 03:00:00 2025",
+			prev:       time.Date(2025, 3, 9, 1, 30, 00, 00, loc),
+			iterations: 1,
+		},
+		{
+			expression: "0 30 1 * * ?",
+			expected:   "Mon Nov 3 01:30:00 2025",
+			prev:       time.Date(2025, 11, 2, 1, 30, 00, 00, loc),
+			iterations: 1,
+		},
+		{
+			expression: "0 30 1 * * ?",
+			expected:   "Sun Nov 2 01:30:00 2025",
+			prev:       time.Date(2025, 11, 2, 1, 00, 00, 00, loc),
+			iterations: 1,
 		},
 	}
 
-	loc, err := time.LoadLocation("America/New_York")
-	assert.IsNil(t, err)
-	prev := time.Date(2023, 4, 29, 12, 00, 00, 00, loc).UnixNano()
 	for _, tt := range tests {
 		test := tt
 		t.Run(test.expression, func(t *testing.T) {
 			t.Parallel()
 			cronTrigger, err := quartz.NewCronTriggerWithLoc(test.expression, loc)
 			assert.IsNil(t, err)
-			result, _ := iterate(prev, cronTrigger, 50)
+			result, _ := iterate(test.prev.UnixNano(), cronTrigger, loc, test.iterations)
 			assert.Equal(t, result, test.expected)
 		})
 	}
@@ -232,7 +269,7 @@ func TestCronExpressionSpecial(t *testing.T) {
 			t.Parallel()
 			cronTrigger, err := quartz.NewCronTrigger(test.expression)
 			assert.IsNil(t, err)
-			result, _ := iterate(prev, cronTrigger, 100)
+			result, _ := iterate(prev, cronTrigger, time.UTC, 100)
 			assert.Equal(t, result, test.expected)
 		})
 	}
@@ -277,7 +314,7 @@ func TestCronExpressionDayOfMonth(t *testing.T) {
 			t.Parallel()
 			cronTrigger, err := quartz.NewCronTrigger(test.expression)
 			assert.IsNil(t, err)
-			result, _ := iterate(prev, cronTrigger, 15)
+			result, _ := iterate(prev, cronTrigger, time.UTC, 15)
 			assert.Equal(t, result, test.expected)
 		})
 	}
@@ -334,7 +371,7 @@ func TestCronExpressionDayOfWeek(t *testing.T) {
 			t.Parallel()
 			cronTrigger, err := quartz.NewCronTrigger(test.expression)
 			assert.IsNil(t, err)
-			result, _ := iterate(prev, cronTrigger, 10)
+			result, _ := iterate(prev, cronTrigger, time.UTC, 10)
 			assert.Equal(t, result, test.expected)
 		})
 	}
@@ -383,17 +420,22 @@ func TestCronExpressionTrim(t *testing.T) {
 
 const readDateLayout = "Mon Jan 2 15:04:05 2006"
 
-func iterate(prev int64, cronTrigger *quartz.CronTrigger, iterations int) (string, error) {
+func formatTime(t int64, loc *time.Location) string {
+	return time.Unix(t/int64(time.Second), 0).In(loc).Format(readDateLayout)
+}
+
+func iterate(prev int64, cronTrigger *quartz.CronTrigger, loc *time.Location,
+	iterations int) (string, error) {
 	var err error
 	for i := 0; i < iterations; i++ {
 		prev, err = cronTrigger.NextFireTime(prev)
-		// log.Print(time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout))
+		// log.Print(formatTime(prev, loc))
 		if err != nil {
 			fmt.Println(err)
 			return "", err
 		}
 	}
-	return time.Unix(prev/int64(time.Second), 0).UTC().Format(readDateLayout), nil
+	return formatTime(prev, loc), nil
 }
 
 func TestCronExpressionParseError(t *testing.T) {
