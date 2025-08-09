@@ -68,6 +68,11 @@ type Scheduler interface {
 
 	// Stop shutdowns the scheduler.
 	Stop()
+	
+	// GracefulStop shutdowns the scheduler and blocks until all jobs
+	// have returned. GracefulStop will return when the context passed
+	// to it has expired.
+	GracefulStop(ctx context.Context) error
 }
 ```
 

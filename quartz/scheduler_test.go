@@ -648,3 +648,107 @@ func jobCount(sched quartz.Scheduler, matchers ...quartz.Matcher[quartz.Schedule
 	keys, _ := sched.GetJobKeys(matchers...)
 	return len(keys)
 }
+
+func TestScheduler_GracefulStop(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
+	sched.Start(ctx)
+
+	timerJob := job.NewFunctionJob(func(_ context.Context) (bool, error) {
+		time.Sleep(250 * time.Millisecond)
+		return true, nil
+	})
+	err = sched.ScheduleJob(
+		quartz.NewJobDetail(timerJob, quartz.NewJobKey("funcJob")),
+		quartz.NewSimpleTrigger(10*time.Millisecond),
+	)
+	assert.IsNil(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+
+	termCtx, termCancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer termCancel()
+	err = sched.GracefulStop(termCtx)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatalf("graceful stop failed: %v", err)
+	}
+
+	assert.Equal(t, sched.IsStarted(), false)
+}
+
+func TestScheduler_GracefulStop_DoesNotCancelJob(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sched, err := quartz.NewStdScheduler()
+	assert.IsNil(t, err)
+	sched.Start(ctx)
+
+	var canceledCount int64
+	timerJob := job.NewFunctionJob(func(ctx context.Context) (bool, error) {
+		timer := time.NewTimer(500 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			atomic.AddInt64(&canceledCount, 1)
+			return true, nil
+		case <-timer.C:
+			return false, nil
+		}
+	})
+	err = sched.ScheduleJob(
+		quartz.NewJobDetail(timerJob, quartz.NewJobKey("funcJob")),
+		quartz.NewSimpleTrigger(10*time.Millisecond),
+	)
+	assert.IsNil(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+
+	termCtx, termCancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer termCancel()
+	err = sched.GracefulStop(termCtx)
+	if err != nil {
+		t.Fatalf("graceful stop failed: %v", err)
+	}
+
+	if got := atomic.LoadInt64(&canceledCount); got != 0 {
+		t.Error("job was canceled")
+	}
+	assert.Equal(t, sched.IsStarted(), false)
+}
+
+func TestScheduler_GracefulStop_WithWorkerLimit(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sched, err := quartz.NewStdScheduler(quartz.WithWorkerLimit(4))
+	assert.IsNil(t, err)
+	sched.Start(ctx)
+
+	timerJob := job.NewFunctionJob(func(_ context.Context) (bool, error) {
+		time.Sleep(250 * time.Millisecond)
+		return true, nil
+	})
+	err = sched.ScheduleJob(
+		quartz.NewJobDetail(timerJob, quartz.NewJobKey("funcJob")),
+		quartz.NewSimpleTrigger(10*time.Millisecond),
+	)
+	assert.IsNil(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+
+	termCtx, termCancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer termCancel()
+	err = sched.GracefulStop(termCtx)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatalf("graceful stop failed: %v", err)
+	}
+
+	assert.Equal(t, sched.IsStarted(), false)
+}
