@@ -64,6 +64,11 @@ type Scheduler interface {
 
 	// Stop shutdowns the scheduler.
 	Stop()
+
+	// GracefulStop shutdowns the scheduler and blocks until all jobs
+	// have returned. GracefulStop will return when the context passed
+	// to it has expired.
+	GracefulStop(ctx context.Context) error
 }
 
 type dispatchedJob struct {
@@ -83,6 +88,7 @@ type StdScheduler struct {
 	wg  sync.WaitGroup
 
 	interrupt chan struct{}
+	stopCh    chan struct{}
 	cancel    context.CancelFunc
 	feeder    chan ScheduledJob
 	dispatch  chan dispatchedJob
@@ -288,6 +294,7 @@ func NewStdScheduler(opts ...SchedulerOpt) (Scheduler, error) {
 	// initialize the scheduler with default values
 	scheduler := &StdScheduler{
 		interrupt:   make(chan struct{}, 1),
+		stopCh:      make(chan struct{}),
 		feeder:      make(chan ScheduledJob),
 		dispatch:    make(chan dispatchedJob),
 		queue:       NewJobQueue(),
@@ -359,6 +366,8 @@ func (sched *StdScheduler) Start(ctx context.Context) {
 		sched.logger.Info("Scheduler is already running")
 		return
 	}
+
+	sched.stopCh = make(chan struct{})
 
 	ctx, sched.cancel = context.WithCancel(ctx)
 	go func() { <-ctx.Done(); sched.Stop() }()
@@ -548,6 +557,28 @@ func (sched *StdScheduler) Stop() {
 	sched.started = false
 }
 
+// GracefulStop shutdowns the scheduler and blocks until all jobs
+// have returned. GracefulStop will return when the context passed
+// to it has expired.
+func (sched *StdScheduler) GracefulStop(ctx context.Context) error {
+	sched.mtx.Lock()
+	defer sched.mtx.Unlock()
+
+	if !sched.started {
+		sched.logger.Info("Scheduler is not running")
+		return nil
+	}
+
+	sched.logger.Info("Gracefully closing the scheduler")
+
+	close(sched.stopCh)
+
+	sched.started = false
+	sched.Wait(ctx)
+
+	return ctx.Err()
+}
+
 func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 	defer sched.wg.Done()
 	const maxTimerDuration = time.Duration(1<<63 - 1)
@@ -573,6 +604,11 @@ func (sched *StdScheduler) startExecutionLoop(ctx context.Context) {
 			sched.logger.Trace("Interrupted waiting for next tick")
 			timer.Stop()
 
+		case <-sched.stopCh:
+			sched.logger.Info("Exit the execution loop")
+			timer.Stop()
+			return
+
 		case <-ctx.Done():
 			sched.logger.Info("Exit the execution loop")
 			timer.Stop()
@@ -591,6 +627,8 @@ func (sched *StdScheduler) startWorkers(ctx context.Context) {
 				for {
 					select {
 					case <-ctx.Done():
+						return
+					case <-sched.stopCh:
 						return
 					case dispatched := <-sched.dispatch:
 						sched.executeWithRetries(dispatched.ctx, dispatched.jobDetail)
