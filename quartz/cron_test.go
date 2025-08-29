@@ -286,8 +286,16 @@ func TestCronExpressionDayOfMonth(t *testing.T) {
 			expected:   "Mon Mar 31 10:15:00 2025",
 		},
 		{
+			expression: "0 15 12 L * ?",
+			expected:   "Mon Mar 31 12:15:00 2025",
+		},
+		{
 			expression: "0 15 10 L-5 * ?",
 			expected:   "Wed Mar 26 10:15:00 2025",
+		},
+		{
+			expression: "0 15 12 L-25 * ?",
+			expected:   "Thu Mar 6 12:15:00 2025",
 		},
 		{
 			expression: "0 15 10 15W * ?",
@@ -304,6 +312,11 @@ func TestCronExpressionDayOfMonth(t *testing.T) {
 		{
 			expression: "0 15 10 LW * ?",
 			expected:   "Mon Mar 31 10:15:00 2025",
+		},
+		// Verify no trigger in January, and in months with fewer than 31 days.
+		{
+			expression: "0 0 12 L-30 * ?",
+			expected:   "Sun Mar 1 12:00:00 2026",
 		},
 	}
 
@@ -331,6 +344,10 @@ func TestCronExpressionDayOfWeek(t *testing.T) {
 			expected:   "Sat Oct 26 10:15:00 2024",
 		},
 		{
+			expression: "0 15 12 ? * L",
+			expected:   "Sat Oct 26 12:15:00 2024",
+		},
+		{
 			expression: "0 15 10 ? * 5L",
 			expected:   "Thu Oct 31 10:15:00 2024",
 		},
@@ -341,6 +358,10 @@ func TestCronExpressionDayOfWeek(t *testing.T) {
 		{
 			expression: "0 15 10 ? * 2#1",
 			expected:   "Mon Nov 4 10:15:00 2024",
+		},
+		{
+			expression: "0 15 12 ? * 2#1",
+			expected:   "Mon Oct 7 12:15:00 2024",
 		},
 		{
 			expression: "0 15 10 ? * MON#1",

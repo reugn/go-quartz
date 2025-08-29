@@ -94,15 +94,50 @@ func (n *DayNode) findForward() result {
 }
 
 func (n *DayNode) isValid() bool {
-	withinLimits := n.isValidDay()
-	if n.isWeekday() {
-		withinLimits = withinLimits && n.isValidWeekday()
+	if !n.isValidDay() {
+		return false
 	}
-	return withinLimits
+
+	if n.isWeekday() {
+		return n.isValidWeekday()
+	}
+
+	return n.isValidDayOfMonth()
 }
 
 func (n *DayNode) isValidWeekday() bool {
-	return contains(n.weekdayValues, n.getWeekday())
+	if n.n == 0 {
+		return contains(n.weekdayValues, n.getWeekday())
+	}
+
+	daysOfWeek := n.daysOfWeekInMonth()
+	if n.n > len(daysOfWeek) {
+		return false
+	}
+
+	if n.n > 0 {
+		return n.Value() == daysOfWeek[n.n-1]
+	}
+
+	return n.Value() == daysOfWeek[len(daysOfWeek)-1]
+}
+
+func (n *DayNode) isValidDayOfMonth() bool {
+	switch {
+	case n.n == 0:
+	case n.n < 0:
+		return n.Value() == n.max()+n.n
+	case n.n == NLastDayOfMonth:
+		return n.Value() == n.max()
+	case n.n&NWeekday != 0:
+		dayDate := n.dayDate()
+		if n.n&NLastDayOfMonth != 0 {
+			return n.Value() == n.max() && isWeekday(dayDate)
+		}
+		return isWeekday(dayDate)
+	}
+
+	return true
 }
 
 func (n *DayNode) isValidDay() bool {
@@ -114,16 +149,18 @@ func (n *DayNode) isWeekday() bool {
 }
 
 func (n *DayNode) getWeekday() int {
-	date := makeDateTime(n.year.Value(), n.month.Value(), n.c.value)
-	return int(date.Weekday())
+	return int(n.dayDate().Weekday())
 }
 
 func (n *DayNode) addDays(offset int) (overflowed bool) {
 	overflowed = n.Value()+offset > n.max()
-	today := makeDateTime(n.year.Value(), n.month.Value(), n.c.value)
-	newDate := today.AddDate(0, 0, offset)
+	newDate := n.dayDate().AddDate(0, 0, offset)
 	n.c.value = newDate.Day()
 	return
+}
+
+func (n *DayNode) dayDate() time.Time {
+	return makeDateTime(n.year.Value(), n.month.Value(), n.c.value)
 }
 
 func (n *DayNode) max() int {
