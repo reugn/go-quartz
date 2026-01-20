@@ -84,7 +84,6 @@ type StdScheduler struct {
 
 	interrupt chan struct{}
 	cancel    context.CancelFunc
-	feeder    chan ScheduledJob
 	dispatch  chan dispatchedJob
 	started   bool
 
@@ -288,7 +287,6 @@ func NewStdScheduler(opts ...SchedulerOpt) (Scheduler, error) {
 	// initialize the scheduler with default values
 	scheduler := &StdScheduler{
 		interrupt:   make(chan struct{}, 1),
-		feeder:      make(chan ScheduledJob),
 		dispatch:    make(chan dispatchedJob),
 		queue:       NewJobQueue(),
 		queueLocker: &sync.Mutex{},
