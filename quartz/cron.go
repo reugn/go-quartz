@@ -356,6 +356,11 @@ func parseListField(field string, bound boundary, names []string) (*cronField, e
 	if err != nil {
 		return nil, err
 	}
+	for _, value := range listValues {
+		if !inScope(value, bound.lower, bound.upper) {
+			return nil, newInvalidCronFieldError("list", field)
+		}
+	}
 	for _, v := range stepValues {
 		stepField, err := parseStepField(v, bound, names)
 		if err != nil {

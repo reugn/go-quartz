@@ -424,6 +424,69 @@ func TestCronExpressionValidate(t *testing.T) {
 	assert.NotEqual(t, quartz.ValidateCronExpression(""), nil)
 }
 
+func TestCronExpressionListBounds(t *testing.T) {
+	t.Parallel()
+	tests := []string{
+		"0,60 * * * * *",
+		"60,0 * * * * *",
+		"* 0,60 * * * *",
+		"* * 0,24 * * *",
+		"0 0 0 0,1 * ?",
+		"0 0 0 1,32 * ?",
+		"0 0 0 * 0,JAN ?",
+		"0 0 0 * JAN,13 ?",
+		"0 0 0 ? * 0,MON",
+		"0 0 0 ? * MON,8",
+		"0 0 0 * * ? 1969,2026",
+		"0 0 0 * * ? 2026,3941",
+		"5-10,60 * * * * *",
+		"0/15,60 * * * * *",
+	}
+	for _, expression := range tests {
+		expression := expression
+		t.Run(expression, func(t *testing.T) {
+			t.Parallel()
+			assert.ErrorIs(t, quartz.ValidateCronExpression(expression), quartz.ErrCronParse)
+			_, err := quartz.NewCronTrigger(expression)
+			assert.ErrorIs(t, err, quartz.ErrCronParse)
+		})
+	}
+}
+
+func TestCronExpressionValidLists(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		expression string
+		previous   string
+		expected   string
+	}{
+		{"0,59 * * * * *", "2026-01-01T00:00:00Z", "2026-01-01T00:00:59Z"},
+		{"0 0,59 * * * *", "2026-01-01T00:00:00Z", "2026-01-01T00:59:00Z"},
+		{"0 0 0,23 * * *", "2026-01-01T00:00:00Z", "2026-01-01T23:00:00Z"},
+		{"0 0 0 1,31 * ?", "2026-01-01T00:00:00Z", "2026-01-31T00:00:00Z"},
+		{"0 0 0 1 jan,12 ?", "2026-01-01T00:00:00Z", "2026-12-01T00:00:00Z"},
+		{"0 0 0 ? * sun,7", "2026-01-01T00:00:00Z", "2026-01-03T00:00:00Z"},
+		{"0 0 0 1 1 ? 2026,2027", "2026-01-01T00:00:00Z", "2027-01-01T00:00:00Z"},
+		{"5,10-12,20/20 * * * * *", "2026-01-01T00:00:05Z", "2026-01-01T00:00:10Z"},
+		{"5,10-12,20/20 * * * * *", "2026-01-01T00:00:12Z", "2026-01-01T00:00:20Z"},
+		{"5,10-12,20/20 * * * * *", "2026-01-01T00:00:20Z", "2026-01-01T00:00:40Z"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.expression+"/"+tt.previous, func(t *testing.T) {
+			t.Parallel()
+			assert.IsNil(t, quartz.ValidateCronExpression(tt.expression))
+			trigger, err := quartz.NewCronTrigger(tt.expression)
+			assert.IsNil(t, err)
+			previous, err := time.Parse(time.RFC3339, tt.previous)
+			assert.IsNil(t, err)
+			next, err := trigger.NextFireTime(previous.UnixNano())
+			assert.IsNil(t, err)
+			assert.Equal(t, time.Unix(0, next).UTC().Format(time.RFC3339), tt.expected)
+		})
+	}
+}
+
 func TestCronExpressionTrim(t *testing.T) {
 	t.Parallel()
 	expression := "  0 0  10 * *  Sun * "
