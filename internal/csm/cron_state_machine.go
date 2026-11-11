@@ -44,5 +44,18 @@ func (csm *CronStateMachine) ValueWithLocation(loc *time.Location) time.Time {
 
 func (csm *CronStateMachine) NextTriggerTime(loc *time.Location) time.Time {
 	csm.findForward()
+	// Resetting the month or year can select a day that does not exist in
+	// that month. Validate it before time.Date normalizes it into another month.
+	// A full Gregorian cycle bounds expressions such as April 31 that never match.
+	for attempts := 0; !csm.isValidDate(); attempts++ {
+		if attempts == 400*12 {
+			return time.Time{}
+		}
+		year, month := csm.year.Value(), csm.month.Value()
+		csm.overflowFrom(months)
+		if csm.year.Value() < year || (csm.year.Value() == year && csm.month.Value() <= month) {
+			return time.Time{}
+		}
+	}
 	return csm.ValueWithLocation(loc)
 }
