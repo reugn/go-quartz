@@ -9,7 +9,6 @@ import (
 )
 
 func TestCronInvalidMonthDay(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name, expression, previous, next string
 	}{
